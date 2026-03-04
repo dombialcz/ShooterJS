@@ -55,7 +55,9 @@ const Collision = {
         const t2 = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
         
         // Check if intersection is within both line segments
-        if (t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1) {
+        // Use small epsilon for floating point tolerance
+        const epsilon = 0.001;
+        if (t1 >= -epsilon && t1 <= 1 + epsilon && t2 >= -epsilon && t2 <= 1 + epsilon) {
             return {
                 x: x1 + t1 * (x2 - x1),
                 y: y1 + t1 * (y2 - y1),
