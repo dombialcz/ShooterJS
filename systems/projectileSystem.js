@@ -122,7 +122,7 @@ const ProjectileSystem = {
                 doorSegment.y2
             );
             
-            if (hit.hit) {
+            if (hit && hit.hit) {
                 return true;
             }
         }
