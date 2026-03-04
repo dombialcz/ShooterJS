@@ -73,7 +73,13 @@ const ProjectileSystem = {
     },
     
     checkWallCollision(transform, collision, gameState) {
+        if (!gameState.walls || gameState.walls.length === 0) {
+            return false;
+        }
+        
         for (const wall of gameState.walls) {
+            if (!wall || wall.x1 === undefined) continue;
+            
             const hit = Collision.circleLineSegment(
                 transform.x,
                 transform.y,
@@ -84,7 +90,7 @@ const ProjectileSystem = {
                 wall.y2
             );
             
-            if (hit.hit) {
+            if (hit && hit.hit) {
                 return true;
             }
         }
