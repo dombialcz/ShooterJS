@@ -96,6 +96,8 @@ const ProjectileSystem = {
             
             // Check all walls and log details
             console.log('Testing against all walls:');
+            console.log(`Bullet: (${prevX.toFixed(1)}, ${prevY.toFixed(1)}) → (${newX.toFixed(1)}, ${newY.toFixed(1)})`);
+            
             for (const wall of gameState.walls) {
                 if (!wall || wall.x1 === undefined) continue;
                 
@@ -104,8 +106,17 @@ const ProjectileSystem = {
                     wall.x1, wall.y1, wall.x2, wall.y2
                 );
                 
-                console.log(`  Wall (${wall.x1},${wall.y1}) → (${wall.x2},${wall.y2}):`, 
-                    intersection ? `HIT at (${intersection.x.toFixed(1)},${intersection.y.toFixed(1)}) t1=${intersection.t1.toFixed(3)} t2=${intersection.t2.toFixed(3)}` : 'no intersection');
+                if (intersection) {
+                    console.log(`  Wall (${wall.x1},${wall.y1}) → (${wall.x2},${wall.y2}): HIT at (${intersection.x.toFixed(1)},${intersection.y.toFixed(1)}) t1=${intersection.t1.toFixed(4)} t2=${intersection.t2.toFixed(4)}`);
+                } else {
+                    // Calculate closest point on wall to bullet path to see how close we are
+                    const wallMidX = (wall.x1 + wall.x2) / 2;
+                    const wallMidY = (wall.y1 + wall.y2) / 2;
+                    const distToWall = Math.sqrt((wallMidX - prevX) ** 2 + (wallMidY - prevY) ** 2);
+                    if (distToWall < 100) {
+                        console.log(`  Wall (${wall.x1},${wall.y1}) → (${wall.x2},${wall.y2}): no intersection (dist ~${distToWall.toFixed(0)})`);
+                    }
+                }
             }
         }
         

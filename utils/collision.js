@@ -66,6 +66,18 @@ const Collision = {
             };
         }
         
+        // Debug: log near misses
+        if (!this._debugCount) this._debugCount = 0;
+        this._debugCount++;
+        if (this._debugCount % 600 === 0 && (Math.abs(t1) < 2 || Math.abs(t2) < 2)) {
+            console.log('Near miss in lineIntersection:', {
+                t1: t1.toFixed(4),
+                t2: t2.toFixed(4),
+                line1: `(${x1.toFixed(1)},${y1.toFixed(1)})→(${x2.toFixed(1)},${y2.toFixed(1)})`,
+                line2: `(${x3.toFixed(1)},${y3.toFixed(1)})→(${x4.toFixed(1)},${y4.toFixed(1)})`
+            });
+        }
+        
         return null;
     },
     

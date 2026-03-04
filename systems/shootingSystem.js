@@ -38,6 +38,7 @@ const ShootingSystem = {
         let spawnX = gunTipX;
         let spawnY = gunTipY;
         let closestDist = Infinity;
+        let wallBlocking = false;
         
         for (const wall of gameState.walls) {
             const intersection = Collision.lineIntersection(
@@ -46,6 +47,7 @@ const ShootingSystem = {
             );
             
             if (intersection) {
+                wallBlocking = true;
                 const dist = Geometry.distance(transform.x, transform.y, intersection.x, intersection.y);
                 if (dist < closestDist) {
                     closestDist = dist;
@@ -58,6 +60,14 @@ const ShootingSystem = {
                     spawnY = intersection.y - (dy / len) * offset;
                 }
             }
+        }
+        
+        if (wallBlocking) {
+            console.log('Gun blocked by wall! Spawning at wall instead of gun tip', {
+                player: {x: transform.x.toFixed(1), y: transform.y.toFixed(1)},
+                gunTip: {x: gunTipX.toFixed(1), y: gunTipY.toFixed(1)},
+                spawn: {x: spawnX.toFixed(1), y: spawnY.toFixed(1)}
+            });
         }
         
         // Create projectile entity
