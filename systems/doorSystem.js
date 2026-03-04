@@ -74,8 +74,9 @@ const DoorSystem = {
             const leverArm = collisionDist / door.width; // 0 to 1
             
             // Push force proportional to penetration and lever arm
+            // Negative sign so door swings AWAY from player
             const penetration = playerCollision.radius - collision.distance;
-            const torque = Math.sign(cross) * penetration * leverArm * CONFIG.DOOR_PUSH_FORCE;
+            const torque = -Math.sign(cross) * penetration * leverArm * CONFIG.DOOR_PUSH_FORCE;
             
             door.angularVelocity += torque;
             
