@@ -107,6 +107,17 @@ const ProjectileSystem = {
     },
     
     checkDoorCollision(transform, collision, gameState) {
+        // Log first time only
+        if (!this._doorCheckLogged) {
+            console.log(`Checking doors: ${gameState.doors.length} doors found`);
+            if (gameState.doors.length > 0) {
+                const door = gameState.doors[0].getComponent('door');
+                const segment = DoorSystem.getDoorSegment(door);
+                console.log('First door segment:', segment);
+            }
+            this._doorCheckLogged = true;
+        }
+        
         for (const doorEntity of gameState.doors) {
             const door = doorEntity.getComponent('door');
             if (!door) continue;
@@ -123,6 +134,7 @@ const ProjectileSystem = {
             );
             
             if (hit && hit.hit) {
+                console.log('DOOR HIT DETECTED!');
                 return true;
             }
         }
