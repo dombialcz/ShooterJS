@@ -18,12 +18,12 @@ const ProjectileSystem = {
             const prevX = transform.x;
             const prevY = transform.y;
             
-            // Update position
-            transform.x += physics.vx * dt;
-            transform.y += physics.vy * dt;
+            // Calculate new position
+            const newX = transform.x + physics.vx * dt;
+            const newY = transform.y + physics.vy * dt;
             
             // Track distance traveled
-            const distThisFrame = Geometry.distance(prevX, prevY, transform.x, transform.y);
+            const distThisFrame = Geometry.distance(prevX, prevY, newX, newY);
             projectile.distanceTraveled += distThisFrame;
             
             // Remove if traveled too far
@@ -33,25 +33,29 @@ const ProjectileSystem = {
             }
             
             // Remove if out of bounds
-            if (!Geometry.inBounds(transform.x, transform.y, 0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT)) {
+            if (!Geometry.inBounds(newX, newY, 0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT)) {
                 projectilesToRemove.push(entity.id);
                 continue;
             }
             
-            // Check collision with walls
-            if (this.checkWallCollision(transform, collision, gameState)) {
+            // Check collision with walls (continuous detection)
+            if (this.checkWallCollision(prevX, prevY, newX, newY, collision, gameState)) {
                 projectilesToRemove.push(entity.id);
                 continue;
             }
             
-            // Check collision with doors
-            if (this.checkDoorCollision(transform, collision, gameState)) {
+            // Check collision with doors (continuous detection)
+            if (this.checkDoorCollision(prevX, prevY, newX, newY, collision, gameState)) {
                 projectilesToRemove.push(entity.id);
                 continue;
             }
             
-            // Check collision with targets
-            const hitTarget = this.checkTargetCollision(transform, collision, projectile, gameState);
+            // Update position only after collision checks pass
+            transform.x = newX;
+            transform.y = newY;
+            
+            // Check collision with targets (point-based is fine for targets)
+            const hitTarget = this.checkTargetCollision(newX, newY, collision, projectile, gameState);
             if (hitTarget) {
                 // Remove target and projectile
                 const targetTransform = hitTarget.getComponent('transform');
@@ -72,81 +76,71 @@ const ProjectileSystem = {
         }
     },
     
-    checkWallCollision(transform, collision, gameState) {
+    checkWallCollision(prevX, prevY, newX, newY, collision, gameState) {
         if (!gameState.walls || gameState.walls.length === 0) {
-            console.log('No walls in gameState!');
             return false;
         }
         
-        // Log first time only
-        if (!this._wallCheckLogged) {
-            console.log(`Checking walls: ${gameState.walls.length} walls found`);
-            console.log('First wall:', gameState.walls[0]);
-            this._wallCheckLogged = true;
-        }
-        
+        // Check if bullet path intersects any wall
         for (const wall of gameState.walls) {
             if (!wall || wall.x1 === undefined) continue;
             
+            // Line-line intersection for the bullet's path
+            const intersection = Collision.lineIntersection(
+                prevX, prevY, newX, newY,
+                wall.x1, wall.y1, wall.x2, wall.y2
+            );
+            
+            if (intersection) {
+                return true;
+            }
+            
+            // Also check circle collision at new position (for thick walls)
             const hit = Collision.circleLineSegment(
-                transform.x,
-                transform.y,
+                newX, newY,
                 collision.radius,
-                wall.x1,
-                wall.y1,
-                wall.x2,
-                wall.y2
+                wall.x1, wall.y1, wall.x2, wall.y2
             );
             
             if (hit && hit.hit) {
-                console.log('WALL HIT DETECTED!');
                 return true;
             }
         }
         return false;
     },
     
-    checkDoorCollision(transform, collision, gameState) {
-        // Log first time only
-        if (!this._doorCheckLogged) {
-            console.log(`Checking doors: ${gameState.doors.length} doors found`);
-            console.log(`Projectile radius: ${collision.radius}`);
-            if (gameState.doors.length > 0) {
-                const door = gameState.doors[0].getComponent('door');
-                const segment = DoorSystem.getDoorSegment(door);
-                console.log('First door segment:', segment);
-            }
-            this._doorCheckLogged = true;
-        }
-        
+    checkDoorCollision(prevX, prevY, newX, newY, collision, gameState) {
         for (const doorEntity of gameState.doors) {
             const door = doorEntity.getComponent('door');
             if (!door) continue;
             
             const doorSegment = DoorSystem.getDoorSegment(door);
+            
+            // Line-line intersection for the bullet's path
+            const intersection = Collision.lineIntersection(
+                prevX, prevY, newX, newY,
+                doorSegment.x1, doorSegment.y1, doorSegment.x2, doorSegment.y2
+            );
+            
+            if (intersection) {
+                return true;
+            }
+            
+            // Also check circle collision at new position
             const hit = Collision.circleLineSegment(
-                transform.x,
-                transform.y,
+                newX, newY,
                 collision.radius,
-                doorSegment.x1,
-                doorSegment.y1,
-                doorSegment.x2,
-                doorSegment.y2
+                doorSegment.x1, doorSegment.y1, doorSegment.x2, doorSegment.y2
             );
             
             if (hit && hit.hit) {
-                console.log('DOOR HIT DETECTED!', {
-                    projectile: {x: transform.x, y: transform.y, r: collision.radius},
-                    door: doorSegment,
-                    hitData: hit
-                });
                 return true;
             }
         }
         return false;
     },
     
-    checkTargetCollision(transform, collision, projectile, gameState) {
+    checkTargetCollision(x, y, collision, projectile, gameState) {
         for (const target of gameState.targets) {
             // Skip if target is already destroyed
             const targetComp = target.getComponent('target');
@@ -159,8 +153,8 @@ const ProjectileSystem = {
             
             // Check circle-circle collision
             const hit = Collision.circleCircle(
-                transform.x,
-                transform.y,
+                x,
+                y,
                 collision.radius,
                 targetTransform.x,
                 targetTransform.y,
