@@ -95,6 +95,26 @@ function createDoor(hingeX, hingeY, width, hingeAngle) {
 }
 
 /**
+ * Create a projectile/bullet entity
+ */
+function createProjectile(x, y, angle, ownerId) {
+    const projectile = new Entity(nextEntityId++, 'projectile');
+    
+    const vx = Math.cos(angle) * CONFIG.PROJECTILE_SPEED;
+    const vy = Math.sin(angle) * CONFIG.PROJECTILE_SPEED;
+    
+    projectile.addComponent('transform', Transform(x, y, angle));
+    projectile.addComponent('physics', Physics(CONFIG.PROJECTILE_SPEED));
+    projectile.getComponent('physics').vx = vx;
+    projectile.getComponent('physics').vy = vy;
+    projectile.addComponent('collision', CollisionCircle(CONFIG.PROJECTILE_RADIUS));
+    projectile.addComponent('renderable', Renderable('circle', CONFIG.PROJECTILE_COLOR, CONFIG.PROJECTILE_RADIUS));
+    projectile.addComponent('projectile', Projectile(ownerId));
+    
+    return projectile;
+}
+
+/**
  * Create a hit marker effect (temporary visual feedback)
  */
 function createHitMarker(x, y) {

@@ -340,6 +340,7 @@ class Game {
         AimingSystem.update(this.state, dt);
         MovementSystem.update(this.state, dt);
         DoorSystem.update(this.state, dt);
+        ProjectileSystem.update(this.state, dt);
         VisionSystem.update(this.state, dt);
         ShootingSystem.update(this.state, dt);
         

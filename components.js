@@ -139,3 +139,15 @@ function Door(hingeX, hingeY, width, hingeAngle) {
         thickness: 8              // Door thickness for rendering
     };
 }
+
+/**
+ * Projectile component - bullet physics
+ */
+function Projectile(ownerId, damage = 10) {
+    return {
+        ownerId: ownerId,         // Entity ID of shooter (to avoid self-hit)
+        damage: damage,
+        distanceTraveled: 0,
+        maxDistance: CONFIG.PROJECTILE_MAX_DISTANCE
+    };
+}

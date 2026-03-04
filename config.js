@@ -15,6 +15,13 @@ const CONFIG = {
     GUN_OFFSET_X: 15, // Distance from player center
     GUN_COLOR: '#1a1a1a',
     
+    // Projectiles
+    PROJECTILE_SPEED: 800, // pixels per second
+    PROJECTILE_RADIUS: 3,
+    PROJECTILE_COLOR: '#ffff00',
+    PROJECTILE_TRAIL_COLOR: 'rgba(255, 255, 100, 0.5)',
+    PROJECTILE_MAX_DISTANCE: 1000,
+    
     // Field of Vision
     FOV_NORMAL: 120 * Math.PI / 180, // 120 degrees in radians
     FOV_ADS: 45 * Math.PI / 180, // 45 degrees in radians
