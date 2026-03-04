@@ -12,7 +12,7 @@ const ProjectileSystem = {
             const collision = entity.getComponent('collision');
             const projectile = entity.getComponent('projectile');
             
-            if (!transform || !physics || !projectile) continue;
+            if (!transform || !physics || !projectile || !collision) continue;
             
             // Store previous position for trail/collision check
             const prevX = transform.x;
@@ -110,6 +110,7 @@ const ProjectileSystem = {
         // Log first time only
         if (!this._doorCheckLogged) {
             console.log(`Checking doors: ${gameState.doors.length} doors found`);
+            console.log(`Projectile radius: ${collision.radius}`);
             if (gameState.doors.length > 0) {
                 const door = gameState.doors[0].getComponent('door');
                 const segment = DoorSystem.getDoorSegment(door);
@@ -134,7 +135,11 @@ const ProjectileSystem = {
             );
             
             if (hit && hit.hit) {
-                console.log('DOOR HIT DETECTED!');
+                console.log('DOOR HIT DETECTED!', {
+                    projectile: {x: transform.x, y: transform.y, r: collision.radius},
+                    door: doorSegment,
+                    hitData: hit
+                });
                 return true;
             }
         }
