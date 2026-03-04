@@ -28,9 +28,10 @@ const ShootingSystem = {
         const gun = player.getComponent('gun');
         const input = player.getComponent('input');
         
-        // Calculate gun tip position
-        const gunTipX = transform.x + Math.cos(transform.rotation) * gun.offsetX;
-        const gunTipY = transform.y + Math.sin(transform.rotation) * gun.offsetX;
+        // Calculate gun tip position (end of barrel)
+        const gunTipDistance = gun.offsetX + gun.length;
+        const gunTipX = transform.x + Math.cos(transform.rotation) * gunTipDistance;
+        const gunTipY = transform.y + Math.sin(transform.rotation) * gunTipDistance;
         
         // Create projectile entity
         const projectile = createProjectile(gunTipX, gunTipY, input.aimAngle, player.id);

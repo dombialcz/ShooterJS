@@ -81,6 +81,20 @@ const ProjectileSystem = {
             return false;
         }
         
+        // Debug: log bullet trajectory occasionally
+        if (!this._wallDebugCount) this._wallDebugCount = 0;
+        this._wallDebugCount++;
+        const shouldLog = this._wallDebugCount % 60 === 0; // Log every 60th bullet
+        
+        if (shouldLog) {
+            console.log('Checking bullet path:', {
+                from: {x: prevX.toFixed(1), y: prevY.toFixed(1)},
+                to: {x: newX.toFixed(1), y: newY.toFixed(1)},
+                distance: Math.sqrt((newX-prevX)**2 + (newY-prevY)**2).toFixed(2),
+                wallCount: gameState.walls.length
+            });
+        }
+        
         // Check if bullet path intersects any wall
         for (const wall of gameState.walls) {
             if (!wall || wall.x1 === undefined) continue;
@@ -92,6 +106,12 @@ const ProjectileSystem = {
             );
             
             if (intersection) {
+                if (shouldLog) {
+                    console.log('LINE INTERSECTION detected!', {
+                        wall: {x1: wall.x1, y1: wall.y1, x2: wall.x2, y2: wall.y2},
+                        intersection: intersection
+                    });
+                }
                 return true;
             }
             
@@ -103,9 +123,20 @@ const ProjectileSystem = {
             );
             
             if (hit && hit.hit) {
+                if (shouldLog) {
+                    console.log('CIRCLE COLLISION detected!', {
+                        wall: {x1: wall.x1, y1: wall.y1, x2: wall.x2, y2: wall.y2},
+                        hit: hit
+                    });
+                }
                 return true;
             }
         }
+        
+        if (shouldLog) {
+            console.log('No wall collision detected');
+        }
+        
         return false;
     },
     
