@@ -123,6 +123,7 @@ class Game {
         console.log('Game initialized!');
         console.log(`Player: ${this.state.player ? 'Created' : 'Missing'}`);
         console.log(`Walls: ${this.state.walls.length}`);
+        console.log(`Doors: ${this.state.doors.length}`);
         console.log(`Targets: ${this.state.targets.length}`);
     }
     
