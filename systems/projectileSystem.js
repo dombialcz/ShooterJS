@@ -93,6 +93,20 @@ const ProjectileSystem = {
                 distance: Math.sqrt((newX-prevX)**2 + (newY-prevY)**2).toFixed(2),
                 wallCount: gameState.walls.length
             });
+            
+            // Check all walls and log details
+            console.log('Testing against all walls:');
+            for (const wall of gameState.walls) {
+                if (!wall || wall.x1 === undefined) continue;
+                
+                const intersection = Collision.lineIntersection(
+                    prevX, prevY, newX, newY,
+                    wall.x1, wall.y1, wall.x2, wall.y2
+                );
+                
+                console.log(`  Wall (${wall.x1},${wall.y1}) → (${wall.x2},${wall.y2}):`, 
+                    intersection ? `HIT at (${intersection.x.toFixed(1)},${intersection.y.toFixed(1)}) t1=${intersection.t1.toFixed(3)} t2=${intersection.t2.toFixed(3)}` : 'no intersection');
+            }
         }
         
         // Check if bullet path intersects any wall
