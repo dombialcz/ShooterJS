@@ -1,16 +1,14 @@
-// Shooting system - handles weapon firing
+// Shooting system - handles hitscan shooting with tracer lines
 
 const ShootingSystem = {
     update(gameState, dt) {
         const player = gameState.player;
         if (!player) return;
         
-        const transform = player.getComponent('transform');
         const gun = player.getComponent('gun');
         const input = player.getComponent('input');
-        const vision = player.getComponent('vision');
         
-        if (!transform || !gun || !input) return;
+        if (!gun || !input) return;
         
         // Can only shoot when ADS is active
         if (!input.isADS) return;
@@ -28,50 +26,117 @@ const ShootingSystem = {
         const gun = player.getComponent('gun');
         const input = player.getComponent('input');
         
-        // Calculate gun tip position (end of barrel)
+        // Calculate gun tip position (start of raycast)
         const gunTipDistance = gun.offsetX + gun.length;
-        const gunTipX = transform.x + Math.cos(transform.rotation) * gunTipDistance;
-        const gunTipY = transform.y + Math.sin(transform.rotation) * gunTipDistance;
+        const startX = transform.x + Math.cos(transform.rotation) * gunTipDistance;
+        const startY = transform.y + Math.sin(transform.rotation) * gunTipDistance;
         
-        // Check if gun barrel passes through any walls
-        // If so, spawn bullet at the wall instead of at gun tip
-        let spawnX = gunTipX;
-        let spawnY = gunTipY;
+        // Raycast in the shooting direction
+        const maxRange = CONFIG.VISION_RANGE || 1000;
+        const endX = startX + Math.cos(input.aimAngle) * maxRange;
+        const endY = startY + Math.sin(input.aimAngle) * maxRange;
+        
+        let closestHit = null;
         let closestDist = Infinity;
-        let wallBlocking = false;
+        let hitType = null;
+        let hitEntity = null;
         
+        // Check walls
         for (const wall of gameState.walls) {
             const intersection = Collision.lineIntersection(
-                transform.x, transform.y, gunTipX, gunTipY,
+                startX, startY, endX, endY,
                 wall.x1, wall.y1, wall.x2, wall.y2
             );
             
             if (intersection) {
-                wallBlocking = true;
-                const dist = Geometry.distance(transform.x, transform.y, intersection.x, intersection.y);
+                const dist = Geometry.distance(startX, startY, intersection.x, intersection.y);
                 if (dist < closestDist) {
                     closestDist = dist;
-                    // Spawn bullet slightly before the wall to prevent spawning inside it
-                    const offset = 2;
-                    const dx = intersection.x - transform.x;
-                    const dy = intersection.y - transform.y;
-                    const len = Math.sqrt(dx * dx + dy * dy);
-                    spawnX = intersection.x - (dx / len) * offset;
-                    spawnY = intersection.y - (dy / len) * offset;
+                    closestHit = {x: intersection.x, y: intersection.y};
+                    hitType = 'wall';
                 }
             }
         }
         
-        if (wallBlocking) {
-            console.log('Gun blocked by wall! Spawning at wall instead of gun tip', {
-                player: {x: transform.x.toFixed(1), y: transform.y.toFixed(1)},
-                gunTip: {x: gunTipX.toFixed(1), y: gunTipY.toFixed(1)},
-                spawn: {x: spawnX.toFixed(1), y: spawnY.toFixed(1)}
-            });
+        // Check doors
+        for (const doorEntity of gameState.doors) {
+            const door = doorEntity.getComponent('door');
+            if (!door) continue;
+            
+            const doorSegment = DoorSystem.getDoorSegment(door);
+            const intersection = Collision.lineIntersection(
+                startX, startY, endX, endY,
+                doorSegment.x1, doorSegment.y1, doorSegment.x2, doorSegment.y2
+            );
+            
+            if (intersection) {
+                const dist = Geometry.distance(startX, startY, intersection.x, intersection.y);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestHit = {x: intersection.x, y: intersection.y};
+                    hitType = 'door';
+                }
+            }
         }
         
-        // Create projectile entity
-        const projectile = createProjectile(spawnX, spawnY, input.aimAngle, player.id);
-        gameState.addEntity(projectile);
+        // Check targets
+        for (const target of gameState.targets) {
+            const targetComp = target.getComponent('target');
+            if (!targetComp || targetComp.isDestroyed) continue;
+            
+            const targetTransform = target.getComponent('transform');
+            const targetCollision = target.getComponent('collision');
+            
+            if (!targetTransform || !targetCollision) continue;
+            
+            // Check if ray intersects target circle
+            // Use line-circle intersection
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const fx = startX - targetTransform.x;
+            const fy = startY - targetTransform.y;
+            
+            const a = dx * dx + dy * dy;
+            const b = 2 * (fx * dx + fy * dy);
+            const c = (fx * fx + fy * fy) - targetCollision.radius * targetCollision.radius;
+            
+            const discriminant = b * b - 4 * a * c;
+            
+            if (discriminant >= 0) {
+                const t = (-b - Math.sqrt(discriminant)) / (2 * a);
+                if (t >= 0 && t <= 1) {
+                    const hitX = startX + t * dx;
+                    const hitY = startY + t * dy;
+                    const dist = Geometry.distance(startX, startY, hitX, hitY);
+                    
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closestHit = {x: hitX, y: hitY};
+                        hitType = 'target';
+                        hitEntity = target;
+                    }
+                }
+            }
+        }
+        
+        // Use closest hit or max range
+        const finalX = closestHit ? closestHit.x : endX;
+        const finalY = closestHit ? closestHit.y : endY;
+        
+        // Create tracer line for visual feedback
+        const tracer = createTracerLine(startX, startY, finalX, finalY, hitType === 'target' ? '#ff0000' : '#ffff00');
+        gameState.addEntity(tracer);
+        
+        // Handle hit
+        if (hitType === 'target' && hitEntity) {
+            const targetComp = hitEntity.getComponent('target');
+            const targetTransform = hitEntity.getComponent('transform');
+            
+            gameState.addScore(targetComp.points);
+            gameState.addEntity(createHitMarker(targetTransform.x, targetTransform.y));
+            gameState.removeEntity(hitEntity.id);
+            
+            console.log(`Target hit! Score: ${gameState.score}`);
+        }
     }
 };

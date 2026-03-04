@@ -15,8 +15,8 @@ const RenderSystem = {
         // Draw targets
         this.drawTargets(ctx, gameState);
         
-        // Draw projectiles
-        this.drawProjectiles(ctx, gameState);
+        // Draw tracer lines (bullet tracers)
+        this.drawTracers(ctx, gameState);
         
         // Draw player and gun
         if (gameState.player) {
@@ -119,42 +119,28 @@ const RenderSystem = {
         }
     },
     
-    drawProjectiles(ctx, gameState) {
+    drawTracers(ctx, gameState) {
         for (const entity of gameState.entities.values()) {
-            if (entity.type !== 'projectile') continue;
+            if (entity.type !== 'tracer') continue;
             
-            const transform = entity.getComponent('transform');
-            const renderable = entity.getComponent('renderable');
-            const physics = entity.getComponent('physics');
+            const tracer = entity.getComponent('tracer');
+            if (!tracer) continue;
             
-            if (!transform || !renderable) continue;
+            // Draw tracer line
+            ctx.strokeStyle = tracer.color;
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
             
-            // Draw motion trail
-            if (physics) {
-                ctx.strokeStyle = CONFIG.PROJECTILE_TRAIL_COLOR;
-                ctx.lineWidth = renderable.size;
-                ctx.lineCap = 'round';
-                
-                const trailLength = 15;
-                const trailX = transform.x - (physics.vx / CONFIG.PROJECTILE_SPEED) * trailLength;
-                const trailY = transform.y - (physics.vy / CONFIG.PROJECTILE_SPEED) * trailLength;
-                
-                ctx.beginPath();
-                ctx.moveTo(trailX, trailY);
-                ctx.lineTo(transform.x, transform.y);
-                ctx.stroke();
-            }
-            
-            // Draw projectile
-            ctx.fillStyle = renderable.color;
             ctx.beginPath();
-            ctx.arc(transform.x, transform.y, renderable.size, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Draw bright outer glow
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
+            ctx.moveTo(tracer.x1, tracer.y1);
+            ctx.lineTo(tracer.x2, tracer.y2);
             ctx.stroke();
+            
+            // Draw glow effect
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = tracer.color;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
         }
     },
     

@@ -341,11 +341,10 @@ class Game {
         AimingSystem.update(this.state, dt);
         MovementSystem.update(this.state, dt);
         DoorSystem.update(this.state, dt);
-        ProjectileSystem.update(this.state, dt);
         VisionSystem.update(this.state, dt);
         ShootingSystem.update(this.state, dt);
         
-        // Remove expired entities (like hit markers)
+        // Remove expired entities (like hit markers and tracers)
         this.removeExpiredEntities();
         
         // Check game over condition

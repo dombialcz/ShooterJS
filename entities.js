@@ -131,3 +131,26 @@ function createHitMarker(x, y) {
     
     return marker;
 }
+
+/**
+ * Create a tracer line (visual feedback for hitscan shot)
+ */
+function createTracerLine(x1, y1, x2, y2, color = '#ffff00') {
+    const tracer = new Entity(nextEntityId++, 'tracer');
+    
+    tracer.addComponent('tracer', {
+        x1: x1,
+        y1: y1,
+        x2: x2,
+        y2: y2,
+        color: color
+    });
+    
+    // Add lifetime component - short duration for quick flash
+    tracer.addComponent('lifetime', {
+        createdAt: Date.now(),
+        duration: 100 // 0.1 seconds
+    });
+    
+    return tracer;
+}
