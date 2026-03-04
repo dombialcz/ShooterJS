@@ -121,3 +121,21 @@ function Input() {
         isADS: false
     };
 }
+
+/**
+ * Door component - swinging door with hinge physics
+ */
+function Door(hingeX, hingeY, width, hingeAngle) {
+    return {
+        hingeX: hingeX,           // Hinge point (fixed)
+        hingeY: hingeY,
+        width: width,             // Door width
+        hingeAngle: hingeAngle,   // Angle of the wall where hinge is attached
+        currentAngle: 0,          // Current swing angle (0 = closed)
+        angularVelocity: 0,       // Rotation speed
+        maxSwingAngle: Math.PI * 0.45,  // Max 80 degrees swing
+        springStrength: 3.0,      // How fast it returns to closed
+        damping: 0.92,            // Angular velocity damping
+        thickness: 8              // Door thickness for rendering
+    };
+}

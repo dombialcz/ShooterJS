@@ -9,6 +9,9 @@ const RenderSystem = {
         // Draw walls (background layer)
         this.drawWalls(ctx, gameState);
         
+        // Draw doors
+        this.drawDoors(ctx, gameState);
+        
         // Draw targets
         this.drawTargets(ctx, gameState);
         
@@ -46,6 +49,40 @@ const RenderSystem = {
             ctx.moveTo(wall.x1, wall.y1);
             ctx.lineTo(wall.x2, wall.y2);
             ctx.stroke();
+        }
+    },
+    
+    drawDoors(ctx, gameState) {
+        for (const entity of gameState.entities.values()) {
+            if (entity.type !== 'door') continue;
+            
+            const door = entity.getComponent('door');
+            const renderable = entity.getComponent('renderable');
+            if (!door || !renderable) continue;
+            
+            // Calculate door endpoints
+            const doorAngle = door.hingeAngle + door.currentAngle;
+            const dx = Math.cos(doorAngle) * door.width;
+            const dy = Math.sin(doorAngle) * door.width;
+            
+            const endX = door.hingeX + dx;
+            const endY = door.hingeY + dy;
+            
+            // Draw door as thick line
+            ctx.strokeStyle = renderable.color;
+            ctx.lineWidth = door.thickness;
+            ctx.lineCap = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(door.hingeX, door.hingeY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            
+            // Draw hinge point
+            ctx.fillStyle = '#333333';
+            ctx.beginPath();
+            ctx.arc(door.hingeX, door.hingeY, 6, 0, Math.PI * 2);
+            ctx.fill();
         }
     },
     

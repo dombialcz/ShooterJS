@@ -83,6 +83,18 @@ function createWall(x1, y1, x2, y2) {
 }
 
 /**
+ * Create a swinging door entity
+ */
+function createDoor(hingeX, hingeY, width, hingeAngle) {
+    const door = new Entity(nextEntityId++, 'door');
+    
+    door.addComponent('door', Door(hingeX, hingeY, width, hingeAngle));
+    door.addComponent('renderable', Renderable('door', CONFIG.DOOR_COLOR || '#8B4513', CONFIG.WALL_THICKNESS));
+    
+    return door;
+}
+
+/**
  * Create a hit marker effect (temporary visual feedback)
  */
 function createHitMarker(x, y) {

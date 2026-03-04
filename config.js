@@ -30,6 +30,11 @@ const CONFIG = {
     WALL_COLOR: '#444444',
     WALL_THICKNESS: 10,
     
+    // Doors
+    DOOR_COLOR: '#8B4513',
+    DOOR_WIDTH: 60,
+    DOOR_PUSH_FORCE: 0.15,
+    
     // Rendering
     DARKNESS_ALPHA: 0.85, // How dark the unseen areas are
     FOV_FILL_COLOR: 'rgba(255, 255, 100, 0.05)', // Slight tint in visible area

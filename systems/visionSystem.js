@@ -11,13 +11,13 @@ const VisionSystem = {
         
         if (!transform || !vision || !input) return;
         
-        // Cast vision cone
+        // Cast vision cone including doors as obstacles
         const visiblePoints = Raycaster.castVisionCone(
             transform.x,
             transform.y,
             input.aimAngle,
             vision.fov,
-            gameState.walls,
+            gameState.getAllWallSegments(),
             vision.range
         );
         

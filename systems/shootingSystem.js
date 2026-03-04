@@ -33,12 +33,12 @@ const ShootingSystem = {
         const gunTipX = transform.x + Math.cos(transform.rotation) * gun.offsetX;
         const gunTipY = transform.y + Math.sin(transform.rotation) * gun.offsetX;
         
-        // Cast a ray
+        // Cast a ray (including doors as obstacles)
         const rayResult = Raycaster.castShootingRay(
             gunTipX,
             gunTipY,
             input.aimAngle,
-            gameState.walls,
+            gameState.getAllWallSegments(),
             vision.range
         );
         

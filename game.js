@@ -8,6 +8,7 @@ class GameState {
         this.isPaused = false;
         this.player = null;
         this.walls = [];
+        this.doors = [];
         this.targets = [];
     }
     
@@ -19,6 +20,8 @@ class GameState {
             this.player = entity;
         } else if (entity.type === 'wall') {
             this.walls.push(entity.getComponent('wall'));
+        } else if (entity.type === 'door') {
+            this.doors.push(entity);
         } else if (entity.type === 'target') {
             this.targets.push(entity);
         }
@@ -62,6 +65,23 @@ class GameState {
             document.getElementById('finalScore').textContent = this.score;
             document.getElementById('gameOver').classList.add('visible');
         }
+    }
+    
+    /**
+     * Get all wall segments including door segments (for vision and collision)
+     */
+    getAllWallSegments() {
+        const segments = [...this.walls];
+        
+        // Add door segments (they act as dynamic walls)
+        for (const doorEntity of this.doors) {
+            const door = doorEntity.getComponent('door');
+            if (door) {
+                segments.push(DoorSystem.getDoorSegment(door));
+            }
+        }
+        
+        return segments;
     }
 }
 
@@ -109,10 +129,8 @@ class Game {
     initializeMap() {
         const rooms = this.generateRooms();
         
-        // Create walls for each room
-        for (const room of rooms) {
-            this.createRoomWalls(room);
-        }
+        // Create walls for rooms, but leave gaps for doors at corridor connections
+        this.createRoomWallsWithDoors();
     }
     
     generateRooms() {
@@ -125,6 +143,7 @@ class Game {
         
         // Room 1 - Top left
         rooms.push({
+            id: 'room1',
             x: padding,
             y: padding,
             width: roomSize,
@@ -133,6 +152,7 @@ class Game {
         
         // Room 2 - Top right
         rooms.push({
+            id: 'room2',
             x: CONFIG.CANVAS_WIDTH - padding - roomSize,
             y: padding,
             width: roomSize,
@@ -141,6 +161,7 @@ class Game {
         
         // Room 3 - Bottom center
         rooms.push({
+            id: 'room3',
             x: CONFIG.CANVAS_WIDTH / 2 - roomSize / 2,
             y: CONFIG.CANVAS_HEIGHT - padding - roomSize,
             width: roomSize,
@@ -149,6 +170,7 @@ class Game {
         
         // Corridor connecting room 1 and 2 (horizontal)
         rooms.push({
+            id: 'corridor_h',
             x: padding + roomSize,
             y: padding + roomSize / 2 - corridorWidth / 2,
             width: CONFIG.CANVAS_WIDTH - 2 * padding - 2 * roomSize,
@@ -158,6 +180,7 @@ class Game {
         
         // Corridor connecting to room 3 (vertical from middle)
         rooms.push({
+            id: 'corridor_v',
             x: CONFIG.CANVAS_WIDTH / 2 - corridorWidth / 2,
             y: padding + roomSize,
             width: corridorWidth,
@@ -166,6 +189,65 @@ class Game {
         });
         
         return rooms;
+    }
+    
+    createRoomWallsWithDoors() {
+        const roomSize = CONFIG.ROOM_SIZE;
+        const corridorWidth = CONFIG.CORRIDOR_WIDTH;
+        const padding = CONFIG.MAP_PADDING;
+        const doorWidth = CONFIG.DOOR_WIDTH;
+        
+        // Room 1 (top left) - add door on right wall
+        const r1 = { x: padding, y: padding, width: roomSize, height: roomSize };
+        const door1Y = r1.y + r1.height / 2;
+        
+        this.state.addEntity(createWall(r1.x, r1.y, r1.x + r1.width, r1.y)); // Top
+        this.state.addEntity(createWall(r1.x + r1.width, r1.y, r1.x + r1.width, door1Y - doorWidth / 2)); // Right top
+        this.state.addEntity(createWall(r1.x + r1.width, door1Y + doorWidth / 2, r1.x + r1.width, r1.y + r1.height)); // Right bottom
+        this.state.addEntity(createWall(r1.x + r1.width, r1.y + r1.height, r1.x, r1.y + r1.height)); // Bottom
+        this.state.addEntity(createWall(r1.x, r1.y + r1.height, r1.x, r1.y)); // Left
+        
+        // Add door at room 1 right entrance
+        this.state.addEntity(createDoor(r1.x + r1.width, door1Y - doorWidth / 2, doorWidth, Math.PI / 2));
+        
+        // Room 2 (top right) - add door on left wall and bottom wall
+        const r2 = { x: CONFIG.CANVAS_WIDTH - padding - roomSize, y: padding, width: roomSize, height: roomSize };
+        const door2Y = r2.y + r2.height / 2;
+        const door3X = r2.x + r2.width / 2;
+        
+        this.state.addEntity(createWall(r2.x, r2.y, r2.x + r2.width, r2.y)); // Top
+        this.state.addEntity(createWall(r2.x + r2.width, r2.y, r2.x + r2.width, r2.y + r2.height)); // Right
+        this.state.addEntity(createWall(r2.x + r2.width, r2.y + r2.height, door3X + doorWidth / 2, r2.y + r2.height)); // Bottom right
+        this.state.addEntity(createWall(door3X - doorWidth / 2, r2.y + r2.height, r2.x, r2.y + r2.height)); // Bottom left
+        this.state.addEntity(createWall(r2.x, r2.y + r2.height, r2.x, door2Y + doorWidth / 2)); // Left bottom
+        this.state.addEntity(createWall(r2.x, door2Y - doorWidth / 2, r2.x, r2.y)); // Left top
+        
+        // Add doors
+        this.state.addEntity(createDoor(r2.x, door2Y + doorWidth / 2, doorWidth, -Math.PI / 2));
+        this.state.addEntity(createDoor(door3X - doorWidth / 2, r2.y + r2.height, doorWidth, 0));
+        
+        // Room 3 (bottom center) - add door on top wall
+        const r3 = { x: CONFIG.CANVAS_WIDTH / 2 - roomSize / 2, y: CONFIG.CANVAS_HEIGHT - padding - roomSize, width: roomSize, height: roomSize };
+        const door4X = r3.x + r3.width / 2;
+        
+        this.state.addEntity(createWall(r3.x, r3.y, door4X - doorWidth / 2, r3.y)); // Top left
+        this.state.addEntity(createWall(door4X + doorWidth / 2, r3.y, r3.x + r3.width, r3.y)); // Top right
+        this.state.addEntity(createWall(r3.x + r3.width, r3.y, r3.x + r3.width, r3.y + r3.height)); // Right
+        this.state.addEntity(createWall(r3.x + r3.width, r3.y + r3.height, r3.x, r3.y + r3.height)); // Bottom
+        this.state.addEntity(createWall(r3.x, r3.y + r3.height, r3.x, r3.y)); // Left
+        
+        // Add door
+        this.state.addEntity(createDoor(door4X + doorWidth / 2, r3.y, doorWidth, Math.PI));
+        
+        // Corridor walls (horizontal)
+        const ch = { x: padding + roomSize, y: padding + roomSize / 2 - corridorWidth / 2, width: CONFIG.CANVAS_WIDTH - 2 * padding - 2 * roomSize, height: corridorWidth };
+        this.state.addEntity(createWall(ch.x, ch.y, ch.x + ch.width, ch.y)); // Top
+        this.state.addEntity(createWall(ch.x, ch.y + ch.height, ch.x + ch.width, ch.y + ch.height)); // Bottom
+        
+        // Corridor walls (vertical)
+        const cv = { x: CONFIG.CANVAS_WIDTH / 2 - corridorWidth / 2, y: padding + roomSize, width: corridorWidth, height: CONFIG.CANVAS_HEIGHT - padding * 2 - roomSize * 2 };
+        this.state.addEntity(createWall(cv.x, cv.y, cv.x, cv.y + cv.height)); // Left
+        this.state.addEntity(createWall(cv.x + cv.width, cv.y, cv.x + cv.width, cv.y + cv.height)); // Right
     }
     
     createRoomWalls(room) {
@@ -182,8 +264,16 @@ class Game {
     }
     
     createTargets() {
-        const rooms = this.generateRooms().filter(r => !r.isCorridor);
+        const roomSize = CONFIG.ROOM_SIZE;
+        const padding = CONFIG.MAP_PADDING;
         const margin = 40;
+        
+        // Define the 3 main rooms
+        const rooms = [
+            { x: padding, y: padding, width: roomSize, height: roomSize }, // Room 1
+            { x: CONFIG.CANVAS_WIDTH - padding - roomSize, y: padding, width: roomSize, height: roomSize }, // Room 2
+            { x: CONFIG.CANVAS_WIDTH / 2 - roomSize / 2, y: CONFIG.CANVAS_HEIGHT - padding - roomSize, width: roomSize, height: roomSize } // Room 3
+        ];
         
         for (let i = 0; i < CONFIG.TARGET_COUNT; i++) {
             // Pick a random room
@@ -249,6 +339,7 @@ class Game {
         InputSystem.update(this.state, dt);
         AimingSystem.update(this.state, dt);
         MovementSystem.update(this.state, dt);
+        DoorSystem.update(this.state, dt);
         VisionSystem.update(this.state, dt);
         ShootingSystem.update(this.state, dt);
         
