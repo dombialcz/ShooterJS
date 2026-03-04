@@ -33,10 +33,35 @@ const ShootingSystem = {
         const gunTipX = transform.x + Math.cos(transform.rotation) * gunTipDistance;
         const gunTipY = transform.y + Math.sin(transform.rotation) * gunTipDistance;
         
-        // Create projectile entity
-        const projectile = createProjectile(gunTipX, gunTipY, input.aimAngle, player.id);
-        gameState.addEntity(projectile);
+        // Check if gun barrel passes through any walls
+        // If so, spawn bullet at the wall instead of at gun tip
+        let spawnX = gunTipX;
+        let spawnY = gunTipY;
+        let closestDist = Infinity;
         
-        console.log('Projectile fired!');
+        for (const wall of gameState.walls) {
+            const intersection = Collision.lineIntersection(
+                transform.x, transform.y, gunTipX, gunTipY,
+                wall.x1, wall.y1, wall.x2, wall.y2
+            );
+            
+            if (intersection) {
+                const dist = Geometry.distance(transform.x, transform.y, intersection.x, intersection.y);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    // Spawn bullet slightly before the wall to prevent spawning inside it
+                    const offset = 2;
+                    const dx = intersection.x - transform.x;
+                    const dy = intersection.y - transform.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    spawnX = intersection.x - (dx / len) * offset;
+                    spawnY = intersection.y - (dy / len) * offset;
+                }
+            }
+        }
+        
+        // Create projectile entity
+        const projectile = createProjectile(spawnX, spawnY, input.aimAngle, player.id);
+        gameState.addEntity(projectile);
     }
 };
