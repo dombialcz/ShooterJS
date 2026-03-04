@@ -11,6 +11,9 @@ const RenderSystem = {
         
         // Draw doors
         this.drawDoors(ctx, gameState);
+
+        // Draw pushable blocks
+        this.drawBlocks(ctx, gameState);
         
         // Draw targets
         this.drawTargets(ctx, gameState);
@@ -118,6 +121,27 @@ const RenderSystem = {
             ctx.fill();
         }
     },
+
+    drawBlocks(ctx, gameState) {
+        if (!gameState.blocks) return;
+
+        for (const block of gameState.blocks) {
+            const transform = block.getComponent('transform');
+            const collision = block.getComponent('collision');
+            const renderable = block.getComponent('renderable');
+            if (!transform || !collision || !renderable) continue;
+
+            const x = transform.x + collision.offsetX;
+            const y = transform.y + collision.offsetY;
+
+            ctx.fillStyle = renderable.color;
+            ctx.fillRect(x, y, collision.width, collision.height);
+
+            ctx.strokeStyle = '#4e6a44';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 1, y + 1, collision.width - 2, collision.height - 2);
+        }
+    },
     
     drawTracers(ctx, gameState) {
         for (const entity of gameState.entities.values()) {
@@ -187,7 +211,7 @@ const RenderSystem = {
     },
     
     drawHitMarkers(ctx, gameState) {
-        const now = Date.now();
+        const now = gameState.timeMs ?? Date.now();
         
         for (const entity of gameState.entities.values()) {
             if (entity.type !== 'hitmarker') continue;

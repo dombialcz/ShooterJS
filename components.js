@@ -151,3 +151,28 @@ function Projectile(ownerId, damage = 10) {
         maxDistance: CONFIG.PROJECTILE_MAX_DISTANCE
     };
 }
+
+/**
+ * Block component - physics properties for movable block entities
+ */
+function Block(width, height, mass = 1.4, friction = 0.82, restitution = 0.0) {
+    return {
+        width: width,
+        height: height,
+        mass: mass,
+        friction: friction,
+        restitution: restitution,
+        vx: 0,
+        vy: 0
+    };
+}
+
+/**
+ * Pushable flags - future-ready for enemies and other actors
+ */
+function Pushable(canBePushedByPlayer = true, canBePushedByEnemies = true) {
+    return {
+        canBePushedByPlayer: canBePushedByPlayer,
+        canBePushedByEnemies: canBePushedByEnemies
+    };
+}

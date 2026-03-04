@@ -49,6 +49,20 @@
             font-size: 24px;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
         }
+
+        #editorLink {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #e7e7e7;
+            text-decoration: none;
+            padding: 6px 10px;
+            border: 1px solid #737373;
+            background: rgba(0, 0, 0, 0.4);
+            pointer-events: all;
+        }
         
         #adsIndicator {
             position: absolute;
@@ -117,6 +131,7 @@
         <canvas id="gameCanvas" width="1280" height="720"></canvas>
         <div id="ui">
             <div id="score">SCORE: <span id="scoreValue">0</span></div>
+            <a id="editorLink" href="./editor.html">Open Map Editor</a>
             <div id="adsIndicator">ADS ACTIVE</div>
             <div id="gameOver">
                 <h1>ALL TARGETS ELIMINATED</h1>
@@ -128,6 +143,7 @@
     
     <!-- Core Configuration -->
     <script src="config.js"></script>
+    <script src="mapFormat.js"></script>
     
     <!-- Utilities -->
     <script src="utils/geometry.js"></script>
@@ -144,8 +160,13 @@
     <script src="systems/aimingSystem.js"></script>
     <script src="systems/visionSystem.js"></script>
     <script src="systems/doorSystem.js"></script>
+    <script src="systems/blockSystem.js"></script>
     <script src="systems/shootingSystem.js"></script>
     <script src="systems/renderSystem.js"></script>
+
+    <!-- Deterministic Simulation Core -->
+    <script src="core/mapBuildUtils.js"></script>
+    <script src="core/simulationCore.js"></script>
     
     <!-- Game Loop -->
     <script src="game.js"></script>

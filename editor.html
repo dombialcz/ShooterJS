@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShooterJS Map Editor</title>
+    <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+    <main class="layout">
+        <aside class="panel">
+            <h1>ShooterJS Editor</h1>
+
+            <section>
+                <h2>Tools</h2>
+                <div class="tool-grid" id="toolGrid">
+                    <button data-tool="wall">Wall</button>
+                    <button data-tool="door">Door</button>
+                    <button data-tool="block">Block</button>
+                    <button data-tool="erase">Erase</button>
+                    <button data-tool="player">Player Spawn</button>
+                </div>
+            </section>
+
+            <section>
+                <h2>Door Settings</h2>
+                <label>Orientation
+                    <select id="doorOrientation">
+                        <option value="horizontal">Horizontal</option>
+                        <option value="vertical">Vertical</option>
+                    </select>
+                </label>
+                <label>Hinge Side
+                    <select id="doorHinge"></select>
+                </label>
+            </section>
+
+            <section>
+                <h2>Map Actions</h2>
+                <div class="actions">
+                    <button id="saveBtn">Save to Browser</button>
+                    <button id="exportBtn">Export JSON</button>
+                    <button id="importBtn">Import JSON</button>
+                    <button id="resetBtn">Reset Default</button>
+                    <button id="previewBtn">Open Game Preview</button>
+                </div>
+            </section>
+
+            <section>
+                <h2>JSON</h2>
+                <textarea id="jsonArea" spellcheck="false"></textarea>
+            </section>
+
+            <p id="status" class="status"></p>
+            <p class="small">Left-click to paint. Drag for walls/blocks/erase.</p>
+            <a href="./index.html" class="small-link">Back to Game</a>
+        </aside>
+
+        <section class="canvas-wrap">
+            <canvas id="editorCanvas" width="1280" height="720"></canvas>
+        </section>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="mapFormat.js"></script>
+    <script src="editor.js"></script>
+</body>
+</html>

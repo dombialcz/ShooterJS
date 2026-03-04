@@ -183,5 +183,30 @@ const Collision = {
             x: closestX + dx * radius,
             y: closestY + dy * radius
         };
+    },
+
+    /**
+     * Line segment vs AABB intersection
+     */
+    segmentIntersectsAABB(x1, y1, x2, y2, rx, ry, rw, rh) {
+        if (this.pointInRect(x1, y1, rx, ry, rw, rh) || this.pointInRect(x2, y2, rx, ry, rw, rh)) {
+            return true;
+        }
+
+        const edges = [
+            [rx, ry, rx + rw, ry],
+            [rx + rw, ry, rx + rw, ry + rh],
+            [rx + rw, ry + rh, rx, ry + rh],
+            [rx, ry + rh, rx, ry]
+        ];
+
+        for (const edge of edges) {
+            const hit = this.lineIntersection(x1, y1, x2, y2, edge[0], edge[1], edge[2], edge[3]);
+            if (hit) {
+                return true;
+            }
+        }
+
+        return false;
     }
 };

@@ -1,0 +1,30 @@
+{
+  "door_push_map": {
+    "intent": "Player pushes a door from left side and door springs back toward closed state",
+    "assertions": [
+      "door angle magnitude increases while pushing",
+      "door angle trends toward zero after releasing movement"
+    ]
+  },
+  "block_push_map": {
+    "intent": "Player pushes a block in a lane with blockers",
+    "assertions": [
+      "front block moves when pushed",
+      "block cannot overlap wall or second block"
+    ]
+  },
+  "occlusion_map": {
+    "intent": "Nearest blocker occludes hitscan before target",
+    "assertions": [
+      "first shot blocked by block",
+      "after moving block and opening door, next blocker determines tracer endpoint"
+    ]
+  },
+  "smoke_default_map": {
+    "intent": "Baseline map boot and update smoke",
+    "assertions": [
+      "game starts without errors",
+      "state serialization returns expected shape"
+    ]
+  }
+}

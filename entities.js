@@ -154,3 +154,18 @@ function createTracerLine(x1, y1, x2, y2, color = '#ffff00') {
     
     return tracer;
 }
+
+/**
+ * Create a pushable block entity
+ */
+function createBlock(x, y, width, height) {
+    const block = new Entity(nextEntityId++, 'block');
+
+    block.addComponent('transform', Transform(x, y, 0));
+    block.addComponent('collision', CollisionAABB(width, height, -width / 2, -height / 2));
+    block.addComponent('renderable', Renderable('rect', CONFIG.BLOCK_COLOR || '#7fb069', { width, height }));
+    block.addComponent('block', Block(width, height));
+    block.addComponent('pushable', Pushable(true, true));
+
+    return block;
+}

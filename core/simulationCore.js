@@ -1,0 +1,188 @@
+// Deterministic simulation core boundary.
+const SimulationCore = {
+    stepSimulation(gameState, dt, options = {}) {
+        if (!gameState || gameState.isPaused || gameState.isGameOver) {
+            return gameState;
+        }
+
+        gameState.timeMs = (gameState.timeMs || 0) + dt * 1000;
+
+        const systems = options.systems || {
+            InputSystem,
+            AimingSystem,
+            MovementSystem,
+            DoorSystem,
+            BlockSystem,
+            VisionSystem,
+            ShootingSystem
+        };
+
+        if (options.inputFrame) {
+            this.applyInputFrame(gameState, options.inputFrame);
+        }
+
+        if (!options.skipInput && systems.InputSystem) {
+            systems.InputSystem.update(gameState, dt, {
+                skipDOM: Boolean(options.skipDOM)
+            });
+        }
+
+        if (systems.AimingSystem) systems.AimingSystem.update(gameState, dt);
+        if (systems.MovementSystem) systems.MovementSystem.update(gameState, dt);
+        if (systems.DoorSystem) systems.DoorSystem.update(gameState, dt);
+        if (systems.BlockSystem) systems.BlockSystem.update(gameState, dt);
+
+        if (systems.MovementSystem && gameState.player) {
+            systems.MovementSystem.resolveWallCollisions(gameState.player, gameState.walls);
+        }
+
+        if (systems.VisionSystem) systems.VisionSystem.update(gameState, dt);
+        if (systems.ShootingSystem) systems.ShootingSystem.update(gameState, dt);
+
+        return gameState;
+    },
+
+    applyInputFrame(gameState, inputFrame) {
+        const player = gameState.player;
+        if (!player) return;
+
+        const input = player.getComponent('input');
+        if (!input) return;
+
+        if (typeof inputFrame.moveX === 'number') input.moveX = inputFrame.moveX;
+        if (typeof inputFrame.moveY === 'number') input.moveY = inputFrame.moveY;
+        if (typeof inputFrame.aimAngle === 'number') input.aimAngle = inputFrame.aimAngle;
+        if (typeof inputFrame.isADS === 'boolean') input.isADS = inputFrame.isADS;
+        if (typeof inputFrame.isShooting === 'boolean') input.isShooting = inputFrame.isShooting;
+    },
+
+    serializeGameState(gameState) {
+        const player = gameState.player;
+        const playerTransform = player ? player.getComponent('transform') : null;
+        const playerPhysics = player ? player.getComponent('physics') : null;
+        const playerInput = player ? player.getComponent('input') : null;
+
+        const doors = gameState.doors
+            .map((doorEntity) => {
+                const door = doorEntity.getComponent('door');
+                if (!door) return null;
+                return {
+                    id: doorEntity.id,
+                    hingeX: round2(door.hingeX),
+                    hingeY: round2(door.hingeY),
+                    currentAngle: round4(door.currentAngle),
+                    angularVelocity: round4(door.angularVelocity)
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.id - b.id);
+
+        const blocks = gameState.blocks
+            .map((blockEntity) => {
+                const transform = blockEntity.getComponent('transform');
+                const collision = blockEntity.getComponent('collision');
+                const block = blockEntity.getComponent('block');
+                if (!transform || !collision || !block) return null;
+                return {
+                    id: blockEntity.id,
+                    x: round2(transform.x),
+                    y: round2(transform.y),
+                    vx: round3(block.vx),
+                    vy: round3(block.vy),
+                    aabb: {
+                        x: round2(transform.x + collision.offsetX),
+                        y: round2(transform.y + collision.offsetY),
+                        w: collision.width,
+                        h: collision.height
+                    }
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.id - b.id);
+
+        const tracers = [];
+        for (const entity of gameState.entities.values()) {
+            if (entity.type !== 'tracer') continue;
+            const tracer = entity.getComponent('tracer');
+            if (!tracer) continue;
+            tracers.push({
+                id: entity.id,
+                x1: round2(tracer.x1),
+                y1: round2(tracer.y1),
+                x2: round2(tracer.x2),
+                y2: round2(tracer.y2),
+                color: tracer.color
+            });
+        }
+        tracers.sort((a, b) => a.id - b.id);
+
+        const map = gameState.currentMapData || null;
+
+        return {
+            coordinateSystem: {
+                origin: '(0,0) at top-left',
+                axis: 'x right, y down'
+            },
+            player: playerTransform
+                ? {
+                    x: round2(playerTransform.x),
+                    y: round2(playerTransform.y),
+                    rotation: round4(playerTransform.rotation),
+                    vx: playerPhysics ? round3(playerPhysics.vx) : 0,
+                    vy: playerPhysics ? round3(playerPhysics.vy) : 0,
+                    input: playerInput
+                        ? {
+                            moveX: round3(playerInput.moveX),
+                            moveY: round3(playerInput.moveY),
+                            aimAngle: round4(playerInput.aimAngle),
+                            isADS: Boolean(playerInput.isADS),
+                            isShooting: Boolean(playerInput.isShooting)
+                        }
+                        : null
+                }
+                : null,
+            doors,
+            blocks,
+            targets: {
+                alive: gameState.targets.length
+            },
+            score: gameState.score,
+            isGameOver: gameState.isGameOver,
+            isPaused: gameState.isPaused,
+            activeMap: map
+                ? {
+                    name: map.meta?.name || null,
+                    version: map.version,
+                    cols: map.cols,
+                    rows: map.rows,
+                    tileSize: map.tileSize
+                }
+                : null,
+            latestTracer: tracers.length > 0 ? tracers[tracers.length - 1] : null
+        };
+    },
+
+    deserializeGameState(payload) {
+        return JSON.parse(JSON.stringify(payload));
+    }
+};
+
+function round2(value) {
+    return Math.round(value * 100) / 100;
+}
+
+function round3(value) {
+    return Math.round(value * 1000) / 1000;
+}
+
+function round4(value) {
+    return Math.round(value * 10000) / 10000;
+}
+
+if (typeof window !== 'undefined') {
+    window.SimulationCore = SimulationCore;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SimulationCore;
+}

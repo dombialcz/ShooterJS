@@ -1,0 +1,17 @@
+{
+  "name": "shooterjs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "serve": "node scripts/serve-static.cjs",
+    "generate:fixtures": "node scripts/generate-test-fixtures.cjs",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test": "npm run test:unit && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "vitest": "^3.2.4"
+  }
+}

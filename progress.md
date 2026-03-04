@@ -1,0 +1,21 @@
+Original prompt: Implement plan to add grid map editor + pushable blocks, including map schema/loader, runtime map loading, block collision/push system, and editor UI with JSON import/export and localStorage.
+
+- Initialized implementation pass.
+- Confirmed current architecture: ECS with hardcoded map walls/doors in game.js.
+- Added map format module (`mapFormat.js`) with MapDataV1 schema, normalize/validate, JSON helpers, and default map.
+- Refactored runtime (`game.js`) to build map from tile data, load from localStorage fallback, spawn player/targets from map, expose map import/export window helpers.
+- Added block components/entities and new block simulation system (`systems/blockSystem.js`) for continuous push behavior.
+- Integrated blocks into rendering, shooting raycasts, and vision obstacles.
+- Added standalone map editor UI (`editor.html`, `editor.css`, `editor.js`) with wall/door/block/erase/player tools and JSON import/export + save/preview flow.
+- Added post-block wall correction pass for player in game update order.
+- Validation: `node --check` passed on all modified/new JS files.
+- Runtime Playwright check blocked because `playwright` package is not installed in the environment used by the skill client.
+- Added deterministic simulation boundary (`core/simulationCore.js`) and map build utilities (`core/mapBuildUtils.js`).
+- Exposed runtime hooks: `window.advanceTime`, `window.render_game_to_text`, `window.serializeGameState`, `window.deserializeGameState`, `window.setActiveMap`.
+- Added simulation-time clock (`gameState.timeMs`) and switched cooldown/lifetime-sensitive behavior to simulation time for deterministic fast-step testing.
+- Added Node test scaffolding: `package.json`, `playwright.config.js`, `vitest.config.js`, static test server script.
+- Added fixture pipeline + fixtures: `tests/fixtures/maps/*.json` + metadata.
+- Added Playwright E2E suite with hybrid state+visual checks.
+- Added Vitest unit suite for collision, map format/build utils, door system invariants, and deterministic simulation core behavior.
+- Added `TESTING.md` with setup, fixture, snapshot, and targeted run docs.
+- Verification: `npm run test:unit && npm run test:e2e` passed.

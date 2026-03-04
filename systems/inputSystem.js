@@ -65,7 +65,7 @@ const InputSystem = {
         e.preventDefault();
     },
     
-    update(gameState, dt) {
+    update(gameState, dt, options = {}) {
         const player = gameState.player;
         if (!player) return;
         
@@ -107,11 +107,15 @@ const InputSystem = {
         input.isADS = this.inputState.mouse.buttons.has(2);
         
         // Update ADS indicator in UI
-        const adsIndicator = document.getElementById('adsIndicator');
-        if (input.isADS) {
-            adsIndicator.classList.add('active');
-        } else {
-            adsIndicator.classList.remove('active');
+        if (!options.skipDOM) {
+            const adsIndicator = document.getElementById('adsIndicator');
+            if (adsIndicator) {
+                if (input.isADS) {
+                    adsIndicator.classList.add('active');
+                } else {
+                    adsIndicator.classList.remove('active');
+                }
+            }
         }
         
         // Update vision FOV based on ADS

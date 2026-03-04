@@ -1,0 +1,75 @@
+# Map Format and Editor
+
+## MapDataV1 Schema
+Defined and validated in `mapFormat.js`.
+
+Fields:
+- `version`
+- `meta` (optional; supports `meta.name`)
+- `tileSize`
+- `cols`, `rows`
+- `tiles` (flat array of length `cols * rows`)
+- `doors` array of `{ col, row, orientation, hingeSide }`
+- `playerSpawn`
+- `targetSpawns`
+
+Tile values:
+- `0`: empty
+- `1`: wall
+- `2`: block
+
+## Door Representation
+- Orientation:
+  - `vertical`: hingeSide must be `top` or `bottom`
+  - `horizontal`: hingeSide must be `left` or `right`
+- Runtime converts descriptor to hinge position + hinge angle via `MapBuildUtils.getDoorEntityDefinition`.
+
+## Runtime Map Loading
+- Active map key: `CONFIG.MAP_STORAGE_KEY` (`shooterjs.activeMap.v1`).
+- `game.js` loads from localStorage; invalid payload falls back to default map.
+- `MapBuildUtils` converts walls to merged segments.
+
+Runtime APIs:
+- `window.loadMapFromJson(text)`
+- `window.exportCurrentMap()`
+- `window.setActiveMap(mapPayload)`
+
+## Editor Behavior
+Files:
+- `editor.html`
+- `editor.css`
+- `editor.js`
+
+Tools:
+- wall
+- door
+- block
+- erase
+- player spawn
+
+Door placement controls:
+- Orientation selector
+- Hinge side selector constrained by orientation
+
+Persistence:
+- Save to localStorage (active map key)
+- JSON import/export
+- Preview in game page
+
+## Fixture Maps for Tests
+Location: `tests/fixtures/maps/`
+- `door_push_map.json`
+- `block_push_map.json`
+- `occlusion_map.json`
+- `smoke_default_map.json`
+- `metadata.json`
+
+Regenerate fixtures:
+- `npm run generate:fixtures`
+
+## When to Update Map Docs/Fixtures
+Update map docs and fixtures when:
+- schema changes
+- door semantics change
+- tile interpretation changes
+- fixture scenarios no longer represent expected gameplay behavior

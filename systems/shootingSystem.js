@@ -14,7 +14,7 @@ const ShootingSystem = {
         if (!input.isADS) return;
         
         // Check if shooting and can shoot (fire rate)
-        const now = Date.now();
+        const now = gameState.timeMs ?? Date.now();
         if (input.isShooting && gun.canShoot && now - gun.lastShotTime >= gun.fireRate) {
             this.shoot(gameState, player);
             gun.lastShotTime = now;
@@ -78,6 +78,22 @@ const ShootingSystem = {
                 }
             }
         }
+
+        // Check blocks
+        if (gameState.blocks) {
+            for (const blockEntity of gameState.blocks) {
+                const hit = this.getRayBlockHit(startX, startY, endX, endY, blockEntity);
+                if (!hit) continue;
+
+                const dist = Geometry.distance(startX, startY, hit.x, hit.y);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestHit = { x: hit.x, y: hit.y };
+                    hitType = 'block';
+                    hitEntity = blockEntity;
+                }
+            }
+        }
         
         // Check targets
         for (const target of gameState.targets) {
@@ -125,6 +141,10 @@ const ShootingSystem = {
         
         // Create tracer line for visual feedback
         const tracer = createTracerLine(startX, startY, finalX, finalY, hitType === 'target' ? '#ff0000' : '#ffff00');
+        const tracerLifetime = tracer.getComponent('lifetime');
+        if (tracerLifetime) {
+            tracerLifetime.createdAt = gameState.timeMs ?? Date.now();
+        }
         gameState.addEntity(tracer);
         
         // Handle hit
@@ -133,10 +153,54 @@ const ShootingSystem = {
             const targetTransform = hitEntity.getComponent('transform');
             
             gameState.addScore(targetComp.points);
-            gameState.addEntity(createHitMarker(targetTransform.x, targetTransform.y));
+            const marker = createHitMarker(targetTransform.x, targetTransform.y);
+            const markerLifetime = marker.getComponent('lifetime');
+            if (markerLifetime) {
+                markerLifetime.createdAt = gameState.timeMs ?? Date.now();
+            }
+            gameState.addEntity(marker);
             gameState.removeEntity(hitEntity.id);
             
             console.log(`Target hit! Score: ${gameState.score}`);
         }
+    },
+
+    getRayBlockHit(startX, startY, endX, endY, blockEntity) {
+        const transform = blockEntity.getComponent('transform');
+        const collision = blockEntity.getComponent('collision');
+        if (!transform || !collision || collision.type !== 'aabb') {
+            return null;
+        }
+
+        const rx = transform.x + collision.offsetX;
+        const ry = transform.y + collision.offsetY;
+        const rw = collision.width;
+        const rh = collision.height;
+
+        const edges = [
+            [rx, ry, rx + rw, ry],
+            [rx + rw, ry, rx + rw, ry + rh],
+            [rx + rw, ry + rh, rx, ry + rh],
+            [rx, ry + rh, rx, ry]
+        ];
+
+        let closest = null;
+        let closestDist = Infinity;
+
+        for (const edge of edges) {
+            const intersection = Collision.lineIntersection(
+                startX, startY, endX, endY,
+                edge[0], edge[1], edge[2], edge[3]
+            );
+            if (!intersection) continue;
+
+            const dist = Geometry.distance(startX, startY, intersection.x, intersection.y);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = { x: intersection.x, y: intersection.y };
+            }
+        }
+
+        return closest;
     }
 };

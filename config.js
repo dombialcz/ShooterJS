@@ -41,6 +41,12 @@ const CONFIG = {
     DOOR_COLOR: '#8B4513',
     DOOR_WIDTH: 60,
     DOOR_PUSH_FORCE: 0.15,
+
+    // Blocks
+    BLOCK_COLOR: '#7fb069',
+    BLOCK_SIZE: 40,
+    BLOCK_PUSH_FORCE: 190,
+    BLOCK_MAX_SPEED: 260,
     
     // Rendering
     DARKNESS_ALPHA: 0.85, // How dark the unseen areas are
@@ -59,4 +65,6 @@ const CONFIG = {
     ROOM_SIZE: 200,
     CORRIDOR_WIDTH: 80,
     MAP_PADDING: 100,
+    MAP_TILE_SIZE: 40,
+    MAP_STORAGE_KEY: 'shooterjs.activeMap.v1',
 };
