@@ -74,7 +74,15 @@ const ProjectileSystem = {
     
     checkWallCollision(transform, collision, gameState) {
         if (!gameState.walls || gameState.walls.length === 0) {
+            console.log('No walls in gameState!');
             return false;
+        }
+        
+        // Log first time only
+        if (!this._wallCheckLogged) {
+            console.log(`Checking walls: ${gameState.walls.length} walls found`);
+            console.log('First wall:', gameState.walls[0]);
+            this._wallCheckLogged = true;
         }
         
         for (const wall of gameState.walls) {
@@ -91,6 +99,7 @@ const ProjectileSystem = {
             );
             
             if (hit && hit.hit) {
+                console.log('WALL HIT DETECTED!');
                 return true;
             }
         }
