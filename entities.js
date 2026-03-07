@@ -50,6 +50,7 @@ function createPlayer(x, y) {
         CONFIG.FOV_NORMAL,
         false
     ));
+    player.addComponent('playerState', PlayerState());
     player.addComponent('input', Input());
     player.addComponent('health', Health(100));
     

@@ -8,13 +8,18 @@ const MovementSystem = {
             const physics = entity.getComponent('physics');
             const input = entity.getComponent('input');
             const collision = entity.getComponent('collision');
+            const playerState = entity.getComponent('playerState');
             
             if (!transform || !physics) continue;
             
             // Apply input to velocity
             if (input) {
-                physics.vx = input.moveX * physics.speed;
-                physics.vy = input.moveY * physics.speed;
+                const effectiveSpeed = playerState
+                    ? physics.baseSpeed * (playerState.movementSpeedMultiplier || 1)
+                    : physics.baseSpeed;
+                physics.speed = effectiveSpeed;
+                physics.vx = input.moveX * effectiveSpeed;
+                physics.vy = input.moveY * effectiveSpeed;
             }
             
             // Update position

@@ -35,6 +35,9 @@ const RenderSystem = {
         
         // Draw crosshair
         this.drawCrosshair(ctx, gameState);
+
+        // Draw ADS firing cone (weapon spread feedback)
+        this.drawFiringCone(ctx, gameState);
         
         // Debug: Draw FOV polygon outline
         // this.drawFOVDebug(ctx, gameState);
@@ -324,6 +327,66 @@ const RenderSystem = {
             ctx.arc(mouseX, mouseY, 2, 0, Math.PI * 2);
             ctx.fill();
         }
+    },
+
+    drawFiringCone(ctx, gameState) {
+        if (!gameState.player) return;
+
+        const player = gameState.player;
+        const input = player.getComponent('input');
+        const transform = player.getComponent('transform');
+        const gun = player.getComponent('gun');
+        if (!input || !transform || !gun || !input.isADS) return;
+
+        const gunTipDistance = gun.offsetX + gun.length;
+        const startX = transform.x + Math.cos(transform.rotation) * gunTipDistance;
+        const startY = transform.y + Math.sin(transform.rotation) * gunTipDistance;
+
+        const aimAngle = input.aimAngle;
+        const halfAngle = Math.max(0, gun.currentSpreadHalfAngleRad || 0);
+        const range = CONFIG.FIRING_CONE_VISUAL_RANGE || 260;
+
+        ctx.save();
+        ctx.strokeStyle = CONFIG.FIRING_CONE_STROKE_COLOR || 'rgba(255, 220, 120, 0.95)';
+        ctx.fillStyle = CONFIG.FIRING_CONE_FILL_COLOR || 'rgba(255, 220, 120, 0.18)';
+        ctx.lineWidth = 2;
+
+        if (halfAngle > 0.0001) {
+            const leftAngle = aimAngle - halfAngle;
+            const rightAngle = aimAngle + halfAngle;
+            const leftX = startX + Math.cos(leftAngle) * range;
+            const leftY = startY + Math.sin(leftAngle) * range;
+            const rightX = startX + Math.cos(rightAngle) * range;
+            const rightY = startY + Math.sin(rightAngle) * range;
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(leftX, leftY);
+            ctx.arc(startX, startY, range, leftAngle, rightAngle);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(leftX, leftY);
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(rightX, rightY);
+            ctx.stroke();
+        } else {
+            const endX = startX + Math.cos(aimAngle) * range;
+            const endY = startY + Math.sin(aimAngle) * range;
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(endX, endY, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
     },
     
     drawFOVDebug(ctx, gameState) {

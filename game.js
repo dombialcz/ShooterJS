@@ -13,6 +13,12 @@ class GameState {
         this.blocks = [];
         this.currentMapData = null;
         this.timeMs = 0;
+        this.shotRngState = CONFIG.SHOT_RNG_SEED >>> 0;
+        this.roundDurationMs = CONFIG.ROUND_DURATION_MS;
+        this.roundTimeRemainingMs = CONFIG.ROUND_DURATION_MS;
+        this.initialTargetCount = 0;
+        this.targetSpawnCursor = 0;
+        this.targetSpawnPoints = [];
     }
 
     addEntity(entity) {
@@ -57,10 +63,20 @@ class GameState {
     }
 
     checkGameOver() {
-        if (this.targets.length === 0 && !this.isGameOver) {
+        if (this.roundTimeRemainingMs <= 0 && !this.isGameOver) {
             this.isGameOver = true;
-            document.getElementById('finalScore').textContent = this.score;
-            document.getElementById('gameOver').classList.add('visible');
+            const finalScore = document.getElementById('finalScore');
+            if (finalScore) {
+                finalScore.textContent = this.score;
+            }
+            const title = document.getElementById('gameOverTitle');
+            if (title) {
+                title.textContent = "TIME'S UP";
+            }
+            const gameOver = document.getElementById('gameOver');
+            if (gameOver) {
+                gameOver.classList.add('visible');
+            }
         }
     }
 
@@ -116,6 +132,7 @@ class Game {
         this.initializeMap();
         this.createPlayerFromMap();
         this.createTargets();
+        this.syncHUD();
 
         InputSystem.init(this.canvas, this.state);
 
@@ -196,22 +213,14 @@ class Game {
     createTargets() {
         const mapData = this.state.currentMapData;
         const tile = mapData.tileSize;
-
-        if (Array.isArray(mapData.targetSpawns) && mapData.targetSpawns.length > 0) {
-            for (const spawn of mapData.targetSpawns) {
-                const x = spawn.col * tile + tile / 2;
-                const y = spawn.row * tile + tile / 2;
-                this.state.addEntity(createTarget(x, y));
-            }
-            return;
-        }
-
-        const margin = tile;
-        for (let i = 0; i < CONFIG.TARGET_COUNT; i++) {
-            const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
-            const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
-            this.state.addEntity(createTarget(x, y));
-        }
+        const spawns = Array.isArray(mapData.targetSpawns) ? mapData.targetSpawns : [];
+        this.state.targetSpawnPoints = spawns.map((spawn) => ({
+            x: spawn.col * tile + tile / 2,
+            y: spawn.row * tile + tile / 2
+        }));
+        this.state.initialTargetCount = this.state.targetSpawnPoints.length;
+        this.state.targetSpawnCursor = 0;
+        this.refillTargets();
     }
 
     start() {
@@ -222,7 +231,10 @@ class Game {
 
     restart() {
         this.state = new GameState();
-        document.getElementById('gameOver').classList.remove('visible');
+        const gameOver = document.getElementById('gameOver');
+        if (gameOver) {
+            gameOver.classList.remove('visible');
+        }
         this.init();
         this.start();
     }
@@ -250,13 +262,27 @@ class Game {
         this.render(alpha);
     }
 
-    update(dt) {
+    update(dt, options = {}) {
         if (this.state.isPaused || this.state.isGameOver) return;
 
-        SimulationCore.stepSimulation(this.state, dt);
+        const requestedMs = dt * 1000;
+        const stepMs = RoundUtils.getStepDurationMs(requestedMs, this.state.roundTimeRemainingMs);
+        if (stepMs <= 0) {
+            this.state.roundTimeRemainingMs = 0;
+            this.state.checkGameOver();
+            this.syncHUD();
+            return;
+        }
+
+        SimulationCore.stepSimulation(this.state, stepMs / 1000, options);
+        this.state.roundTimeRemainingMs = RoundUtils.getRemainingMs(this.state.timeMs, this.state.roundDurationMs);
 
         this.removeExpiredEntities();
         this.state.checkGameOver();
+        if (!this.state.isGameOver) {
+            this.refillTargets();
+        }
+        this.syncHUD();
     }
 
     removeExpiredEntities() {
@@ -281,9 +307,7 @@ class Game {
 
     stepFrames(frameCount, options = {}) {
         for (let i = 0; i < frameCount; i++) {
-            SimulationCore.stepSimulation(this.state, this.fixedDtSeconds, options);
-            this.removeExpiredEntities();
-            this.state.checkGameOver();
+            this.update(this.fixedDtSeconds, options);
             if (this.state.isGameOver) break;
         }
     }
@@ -296,6 +320,83 @@ class Game {
 
     renderGameToText() {
         return JSON.stringify(SimulationCore.serializeGameState(this.state));
+    }
+
+    refillTargets() {
+        const missingCount = Math.max(0, this.state.initialTargetCount - this.state.targets.length);
+        if (missingCount <= 0 || this.state.targetSpawnPoints.length === 0) {
+            return;
+        }
+
+        const targetRadius = CONFIG.TARGET_RADIUS;
+        const selection = TargetSpawnUtils.collectSpawnSelections({
+            spawnPoints: this.state.targetSpawnPoints,
+            startCursor: this.state.targetSpawnCursor,
+            desiredCount: missingCount,
+            radius: targetRadius,
+            canvasWidth: CONFIG.CANVAS_WIDTH,
+            canvasHeight: CONFIG.CANVAS_HEIGHT,
+            walls: this.state.walls,
+            doorSegments: this.state.doors
+                .map((doorEntity) => doorEntity.getComponent('door'))
+                .filter(Boolean)
+                .map((door) => DoorSystem.getDoorSegment(door)),
+            blocks: this.state.blocks
+                .map((block) => {
+                    const transform = block.getComponent('transform');
+                    const collision = block.getComponent('collision');
+                    if (!transform || !collision || collision.type !== 'aabb') return null;
+                    return {
+                        x: transform.x + collision.offsetX,
+                        y: transform.y + collision.offsetY,
+                        w: collision.width,
+                        h: collision.height
+                    };
+                })
+                .filter(Boolean),
+            playerCircle: this.getPlayerCircle(),
+            targetCircles: this.state.targets
+                .map((target) => {
+                    const transform = target.getComponent('transform');
+                    const collision = target.getComponent('collision');
+                    if (!transform || !collision || collision.type !== 'circle') return null;
+                    return {
+                        x: transform.x,
+                        y: transform.y,
+                        radius: collision.radius
+                    };
+                })
+                .filter(Boolean)
+        });
+
+        this.state.targetSpawnCursor = selection.nextCursor;
+        for (const spawn of selection.selections) {
+            this.state.addEntity(createTarget(spawn.x, spawn.y));
+        }
+    }
+
+    getPlayerCircle() {
+        if (!this.state.player) return null;
+        const transform = this.state.player.getComponent('transform');
+        const collision = this.state.player.getComponent('collision');
+        if (!transform || !collision || collision.type !== 'circle') return null;
+        return {
+            x: transform.x,
+            y: transform.y,
+            radius: collision.radius
+        };
+    }
+
+    syncHUD() {
+        const scoreValue = document.getElementById('scoreValue');
+        if (scoreValue) {
+            scoreValue.textContent = this.state.score;
+        }
+
+        const timerValue = document.getElementById('timerValue');
+        if (timerValue) {
+            timerValue.textContent = RoundUtils.formatCountdown(this.state.roundTimeRemainingMs);
+        }
     }
 }
 

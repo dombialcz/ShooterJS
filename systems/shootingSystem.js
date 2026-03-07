@@ -9,6 +9,8 @@ const ShootingSystem = {
         const input = player.getComponent('input');
         
         if (!gun || !input) return;
+
+        this.updateFiringConeState(gameState, player);
         
         // Can only shoot when ADS is active
         if (!input.isADS) return;
@@ -25,6 +27,7 @@ const ShootingSystem = {
         const transform = player.getComponent('transform');
         const gun = player.getComponent('gun');
         const input = player.getComponent('input');
+        const shotAngle = this.getShotAngle(gameState, player);
         
         // Calculate gun tip position (start of raycast)
         const gunTipDistance = gun.offsetX + gun.length;
@@ -33,8 +36,8 @@ const ShootingSystem = {
         
         // Raycast in the shooting direction
         const maxRange = CONFIG.VISION_RANGE || 1000;
-        const endX = startX + Math.cos(input.aimAngle) * maxRange;
-        const endY = startY + Math.sin(input.aimAngle) * maxRange;
+        const endX = startX + Math.cos(shotAngle) * maxRange;
+        const endY = startY + Math.sin(shotAngle) * maxRange;
         
         let closestHit = null;
         let closestDist = Infinity;
@@ -202,5 +205,59 @@ const ShootingSystem = {
         }
 
         return closest;
+    },
+
+    updateFiringConeState(gameState, player) {
+        const input = player.getComponent('input');
+        const gun = player.getComponent('gun');
+        if (!input || !gun) return;
+
+        const startHalfRad = (CONFIG.FIRING_CONE_START_DEG * Math.PI / 180) * 0.5;
+        const minHalfRad = (CONFIG.FIRING_CONE_MIN_DEG * Math.PI / 180) * 0.5;
+        const durationMs = Math.max(1, CONFIG.FIRING_CONE_TIGHTEN_MS || 2000);
+        const now = gameState.timeMs ?? 0;
+
+        if (!input.isADS) {
+            gun.adsStartedAtMs = null;
+            gun.currentSpreadHalfAngleRad = startHalfRad;
+            return;
+        }
+
+        if (gun.adsStartedAtMs === null || gun.adsStartedAtMs === undefined) {
+            gun.adsStartedAtMs = now;
+        }
+
+        const elapsed = Math.max(0, now - gun.adsStartedAtMs);
+        const tightenProgress = Math.min(1, elapsed / durationMs);
+        const spread = startHalfRad + (minHalfRad - startHalfRad) * tightenProgress;
+        gun.currentSpreadHalfAngleRad = Math.max(minHalfRad, spread);
+    },
+
+    nextDeterministicRandom(gameState) {
+        const a = 1664525;
+        const c = 1013904223;
+        const current = (gameState.shotRngState >>> 0) || 0;
+        const next = (Math.imul(current, a) + c) >>> 0;
+        gameState.shotRngState = next;
+        return next / 4294967296;
+    },
+
+    getShotAngle(gameState, player) {
+        const input = player.getComponent('input');
+        const gun = player.getComponent('gun');
+        if (!input || !gun) return 0;
+
+        const spreadHalfAngle = Math.max(0, gun.currentSpreadHalfAngleRad || 0);
+        if (spreadHalfAngle <= 0) {
+            return input.aimAngle;
+        }
+
+        const random01 = this.nextDeterministicRandom(gameState);
+        const offset = (random01 * 2 - 1) * spreadHalfAngle;
+        return input.aimAngle + offset;
     }
 };
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = ShootingSystem;
+}

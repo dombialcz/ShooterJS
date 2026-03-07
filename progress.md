@@ -19,3 +19,20 @@ Original prompt: Implement plan to add grid map editor + pushable blocks, includ
 - Added Vitest unit suite for collision, map format/build utils, door system invariants, and deterministic simulation core behavior.
 - Added `TESTING.md` with setup, fixture, snapshot, and targeted run docs.
 - Verification: `npm run test:unit && npm run test:e2e` passed.
+- Added ADS firing cone foundation: new config constants, gun spread state (`adsStartedAtMs`, `currentSpreadHalfAngleRad`), deterministic shot RNG state in `GameState`, and scatter/tightening logic in `ShootingSystem`.
+- Added visual ADS firing cone rendering in `RenderSystem` (wedge when spread > 0, line+point when fully tightened).
+- Extended `SimulationCore.serializeGameState` with `player.firingCone` and top-level `shotRngState` for deterministic test/debug visibility.
+- Added automated coverage for new firing cone behavior:
+  - unit tests in `tests/unit/shooting-system.test.js` (deterministic RNG, linear tighten curve, ADS-release reset)
+  - simulation-core serialization assertions for `player.firingCone` + `shotRngState`
+  - e2e gameplay scenario validating wide-to-tight cone and scatter-to-precision transition with screenshots.
+- Fixed e2e cone test setup: keep targets alive to avoid `isGameOver` halting simulation; still clear wall/door/block occluders and guard against missing tracer.
+- Updated Playwright snapshots for intentional firing-cone visuals (`firing-cone-wide`, `firing-cone-tight`).
+- Full validation pass completed: `npm run test` now passes (unit + e2e).
+- Attempted `develop-web-game` skill client run; blocked because the client imports `playwright` package not resolvable from skill script context (`ERR_MODULE_NOT_FOUND`).
+- Widened initial ADS firing cone for lower starting precision and added player-owned ADS slow-walk state via `playerState`.
+- Deterministic state now exposes player movement speed multiplier, and e2e coverage verifies ADS movement is slower than normal movement.
+- Converted the round loop into a 2-minute time trial with visible countdown HUD and timer-based game over.
+- Added deterministic target spawn validation/refill helpers so targets only spawn on valid map `targetSpawns` and refill back toward the intended concurrent count without random placement.
+- Extended serialized state with `round` data and `targets.targetCount`, plus added unit/e2e coverage for spawn validity, refill behavior, and exact timer expiry.
+- Validation: `npm run test` passed after time-trial and target refill changes.

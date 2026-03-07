@@ -13,6 +13,10 @@ test('smoke map boots and exposes deterministic hooks', async ({ page }) => {
   expect(snapshot.doors.length).toBeGreaterThan(0);
   expect(snapshot.blocks.length).toBeGreaterThan(0);
   expect(snapshot.activeMap.name).toBe('smoke_default_map');
+  expect(snapshot.targets.alive).toBe(snapshot.targets.targetCount);
+  expect(snapshot.round.durationMs).toBe(120000);
+  expect(snapshot.round.timeRemainingMs).toBe(119900);
+  expect(snapshot.round.isExpired).toBe(false);
 
   await expect(page).toHaveScreenshot('smoke_default.png');
 });

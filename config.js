@@ -14,6 +14,13 @@ const CONFIG = {
     GUN_WIDTH: 8,
     GUN_OFFSET_X: 15, // Distance from player center
     GUN_COLOR: '#1a1a1a',
+    FIRING_CONE_START_DEG: 20,
+    FIRING_CONE_MIN_DEG: 0,
+    FIRING_CONE_TIGHTEN_MS: 2000,
+    FIRING_CONE_VISUAL_RANGE: 260,
+    FIRING_CONE_STROKE_COLOR: 'rgba(255, 220, 120, 0.95)',
+    FIRING_CONE_FILL_COLOR: 'rgba(255, 220, 120, 0.18)',
+    PLAYER_ADS_SPEED_MULTIPLIER: 0.55,
     
     // Projectiles
     PROJECTILE_SPEED: 800, // pixels per second
@@ -32,6 +39,7 @@ const CONFIG = {
     TARGET_RADIUS: 20,
     TARGET_COLOR: '#ff4444',
     TARGET_COUNT: 5,
+    ROUND_DURATION_MS: 120000,
     
     // Walls
     WALL_COLOR: '#444444',
@@ -67,4 +75,5 @@ const CONFIG = {
     MAP_PADDING: 100,
     MAP_TILE_SIZE: 40,
     MAP_STORAGE_KEY: 'shooterjs.activeMap.v1',
+    SHOT_RNG_SEED: 0x12345678
 };

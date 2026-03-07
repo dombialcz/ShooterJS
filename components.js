@@ -14,6 +14,7 @@ function Physics(speed = 0, friction = 0.8) {
     return {
         vx: 0,
         vy: 0,
+        baseSpeed: speed,
         speed: speed,
         friction: friction
     };
@@ -67,6 +68,7 @@ function Health(current, max = null) {
  * Gun component - weapon properties
  */
 function Gun(length, width, offsetX, offsetY) {
+    const startSpreadHalfAngleRad = (CONFIG.FIRING_CONE_START_DEG * Math.PI / 180) * 0.5;
     return {
         length: length,
         width: width,
@@ -74,7 +76,9 @@ function Gun(length, width, offsetX, offsetY) {
         offsetY: offsetY,
         canShoot: true,
         lastShotTime: 0,
-        fireRate: 200 // milliseconds between shots
+        fireRate: 200, // milliseconds between shots
+        adsStartedAtMs: null,
+        currentSpreadHalfAngleRad: startSpreadHalfAngleRad
     };
 }
 
@@ -119,6 +123,16 @@ function Input() {
         aimAngle: 0,
         isShooting: false,
         isADS: false
+    };
+}
+
+/**
+ * Player state - player-owned toggles and movement modifiers
+ */
+function PlayerState() {
+    return {
+        isADSActive: false,
+        movementSpeedMultiplier: 1
     };
 }
 

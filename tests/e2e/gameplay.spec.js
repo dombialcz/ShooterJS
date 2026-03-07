@@ -157,4 +157,245 @@ test.describe('Deterministic gameplay maps', () => {
 
     await expect(page).toHaveScreenshot('occlusion_end.png');
   });
+
+  test('ADS firing cone shrinks and reaches precise shots after 2s', async ({ page }) => {
+    await setActiveMap(page, 'smoke_default_map');
+    await page.goto('/index.html');
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+
+    await page.evaluate(() => {
+      const state = window.game.state;
+      for (const entity of [...state.entities.values()]) {
+        if (entity.type === 'wall' || entity.type === 'door' || entity.type === 'block') {
+          state.entities.delete(entity.id);
+        }
+      }
+      state.walls = [];
+      state.doors = [];
+      state.blocks = [];
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 0,
+          moveY: 0,
+          aimAngle: 0,
+          isADS: true,
+          isShooting: false
+        }
+      });
+    });
+
+    await expect(page).toHaveScreenshot('firing_cone_wide.png');
+
+    const firstDeviation = await page.evaluate(() => {
+      const state = window.game.state;
+      const player = state.player;
+      const gun = player.getComponent('gun');
+      gun.lastShotTime = -1e9;
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 0,
+          moveY: 0,
+          aimAngle: 0,
+          isADS: true,
+          isShooting: true
+        }
+      });
+
+      let latestTracer = null;
+      for (const entity of state.entities.values()) {
+        if (entity.type !== 'tracer') continue;
+        if (!latestTracer || entity.id > latestTracer.id) latestTracer = entity;
+      }
+      if (!latestTracer) return null;
+      const tracer = latestTracer.getComponent('tracer');
+      const angle = Math.atan2(tracer.y2 - tracer.y1, tracer.x2 - tracer.x1);
+      return Math.abs(angle);
+    });
+
+    expect(firstDeviation).not.toBeNull();
+    expect(firstDeviation).toBeGreaterThan(0.001);
+
+    await page.evaluate(() => {
+      window.advanceTime(2000, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 0,
+          moveY: 0,
+          aimAngle: 0,
+          isADS: true,
+          isShooting: false
+        }
+      });
+    });
+
+    await expect(page).toHaveScreenshot('firing_cone_tight.png');
+
+    const secondDeviation = await page.evaluate(() => {
+      const state = window.game.state;
+      const player = state.player;
+      const gun = player.getComponent('gun');
+      gun.lastShotTime = -1e9;
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 0,
+          moveY: 0,
+          aimAngle: 0,
+          isADS: true,
+          isShooting: true
+        }
+      });
+
+      let latestTracer = null;
+      for (const entity of state.entities.values()) {
+        if (entity.type !== 'tracer') continue;
+        if (!latestTracer || entity.id > latestTracer.id) latestTracer = entity;
+      }
+      if (!latestTracer) return null;
+      const tracer = latestTracer.getComponent('tracer');
+      const angle = Math.atan2(tracer.y2 - tracer.y1, tracer.x2 - tracer.x1);
+      return Math.abs(angle);
+    });
+
+    expect(secondDeviation).not.toBeNull();
+    expect(secondDeviation).toBeLessThan(1e-6);
+  });
+
+  test('player moves slower while ADS is held', async ({ page }) => {
+    await setActiveMap(page, 'smoke_default_map');
+    await page.goto('/index.html');
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+
+    const distances = await page.evaluate(() => {
+      function resetToSpawn() {
+        const state = window.game.state;
+        const spawn = state.currentMapData.playerSpawn;
+        const tile = state.currentMapData.tileSize;
+        const transform = state.player.getComponent('transform');
+        const physics = state.player.getComponent('physics');
+        const input = state.player.getComponent('input');
+        const playerState = state.player.getComponent('playerState');
+
+        transform.x = spawn.col * tile + tile / 2;
+        transform.y = spawn.row * tile + tile / 2;
+        physics.vx = 0;
+        physics.vy = 0;
+        input.moveX = 0;
+        input.moveY = 0;
+        input.isADS = false;
+        input.isShooting = false;
+        playerState.isADSActive = false;
+        playerState.movementSpeedMultiplier = 1;
+      }
+
+      resetToSpawn();
+      const state = window.game.state;
+      const startX = state.player.getComponent('transform').x;
+
+      window.advanceTime(1000, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 1,
+          moveY: 0,
+          aimAngle: 0,
+          isADS: false,
+          isShooting: false
+        }
+      });
+      const normalX = state.player.getComponent('transform').x;
+      const normalMultiplier = JSON.parse(window.render_game_to_text()).player.movementSpeedMultiplier;
+
+      resetToSpawn();
+      window.advanceTime(1000, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 1,
+          moveY: 0,
+          aimAngle: 0,
+          isADS: true,
+          isShooting: false
+        }
+      });
+      const adsX = state.player.getComponent('transform').x;
+      const adsMultiplier = JSON.parse(window.render_game_to_text()).player.movementSpeedMultiplier;
+
+      return {
+        normalDistance: normalX - startX,
+        adsDistance: adsX - startX,
+        normalMultiplier,
+        adsMultiplier
+      };
+    });
+
+    expect(distances.normalMultiplier).toBe(1);
+    expect(distances.adsMultiplier).toBeCloseTo(0.55, 2);
+    expect(distances.adsDistance).toBeLessThan(distances.normalDistance * 0.7);
+  });
+
+  test('destroyed targets are refilled back to the intended concurrent count', async ({ page }) => {
+    await setActiveMap(page, 'smoke_default_map');
+    await page.goto('/index.html');
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+
+    const result = await page.evaluate(() => {
+      window.advanceTime(32);
+      const state = window.game.state;
+      const beforeIds = state.targets.map((target) => target.id).sort((a, b) => a - b);
+      const player = state.player;
+      const transform = player.getComponent('transform');
+      const input = player.getComponent('input');
+      const gun = player.getComponent('gun');
+      const targetTransform = state.targets[0].getComponent('transform');
+
+      input.aimAngle = Math.atan2(targetTransform.y - transform.y, targetTransform.x - transform.x);
+      gun.lastShotTime = -1e9;
+
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 0,
+          moveY: 0,
+          aimAngle: input.aimAngle,
+          isADS: true,
+          isShooting: true
+        }
+      });
+
+      const afterIds = state.targets.map((target) => target.id).sort((a, b) => a - b);
+      return {
+        beforeIds,
+        afterIds,
+        score: state.score,
+        alive: state.targets.length,
+        targetCount: state.initialTargetCount
+      };
+    });
+
+    expect(result.score).toBe(10);
+    expect(result.alive).toBe(result.targetCount);
+    expect(result.beforeIds).not.toEqual(result.afterIds);
+  });
+
+  test('time trial ends exactly when the countdown expires', async ({ page }) => {
+    await setActiveMap(page, 'smoke_default_map');
+    await page.goto('/index.html');
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+
+    await page.evaluate(() => window.advanceTime(119000));
+    const beforeExpiry = await getState(page);
+    expect(beforeExpiry.round.isExpired).toBe(false);
+    expect(beforeExpiry.isGameOver).toBe(false);
+    expect(beforeExpiry.round.timeRemainingMs).toBe(1000);
+
+    await page.evaluate(() => window.advanceTime(1000));
+    const expired = await getState(page);
+    expect(expired.round.isExpired).toBe(true);
+    expect(expired.round.timeRemainingMs).toBe(0);
+    expect(expired.isGameOver).toBe(true);
+
+    const overlayVisible = await page.evaluate(() => document.getElementById('gameOver').classList.contains('visible'));
+    expect(overlayVisible).toBe(true);
+  });
 });

@@ -48,12 +48,18 @@ const SimulationCore = {
 
         const input = player.getComponent('input');
         if (!input) return;
+        const playerState = player.getComponent('playerState');
 
         if (typeof inputFrame.moveX === 'number') input.moveX = inputFrame.moveX;
         if (typeof inputFrame.moveY === 'number') input.moveY = inputFrame.moveY;
         if (typeof inputFrame.aimAngle === 'number') input.aimAngle = inputFrame.aimAngle;
         if (typeof inputFrame.isADS === 'boolean') input.isADS = inputFrame.isADS;
         if (typeof inputFrame.isShooting === 'boolean') input.isShooting = inputFrame.isShooting;
+
+        if (playerState && typeof inputFrame.isADS === 'boolean') {
+            playerState.isADSActive = inputFrame.isADS;
+            playerState.movementSpeedMultiplier = inputFrame.isADS ? CONFIG.PLAYER_ADS_SPEED_MULTIPLIER : 1;
+        }
     },
 
     serializeGameState(gameState) {
@@ -61,6 +67,8 @@ const SimulationCore = {
         const playerTransform = player ? player.getComponent('transform') : null;
         const playerPhysics = player ? player.getComponent('physics') : null;
         const playerInput = player ? player.getComponent('input') : null;
+        const playerGun = player ? player.getComponent('gun') : null;
+        const playerState = player ? player.getComponent('playerState') : null;
 
         const doors = gameState.doors
             .map((doorEntity) => {
@@ -130,6 +138,7 @@ const SimulationCore = {
                     rotation: round4(playerTransform.rotation),
                     vx: playerPhysics ? round3(playerPhysics.vx) : 0,
                     vy: playerPhysics ? round3(playerPhysics.vy) : 0,
+                    movementSpeedMultiplier: playerState ? round3(playerState.movementSpeedMultiplier || 1) : 1,
                     input: playerInput
                         ? {
                             moveX: round3(playerInput.moveX),
@@ -138,13 +147,25 @@ const SimulationCore = {
                             isADS: Boolean(playerInput.isADS),
                             isShooting: Boolean(playerInput.isShooting)
                         }
+                        : null,
+                    firingCone: playerGun
+                        ? {
+                            halfAngleRad: round4(playerGun.currentSpreadHalfAngleRad || 0),
+                            tightenProgress: round4(getFiringConeTightenProgress(gameState, playerGun))
+                        }
                         : null
                 }
                 : null,
             doors,
             blocks,
             targets: {
-                alive: gameState.targets.length
+                alive: gameState.targets.length,
+                targetCount: gameState.initialTargetCount || 0
+            },
+            round: {
+                timeRemainingMs: Math.max(0, Math.round(gameState.roundTimeRemainingMs || 0)),
+                durationMs: Math.max(0, Math.round(gameState.roundDurationMs || 0)),
+                isExpired: Boolean((gameState.roundTimeRemainingMs || 0) <= 0 || gameState.isGameOver)
             },
             score: gameState.score,
             isGameOver: gameState.isGameOver,
@@ -158,7 +179,8 @@ const SimulationCore = {
                     tileSize: map.tileSize
                 }
                 : null,
-            latestTracer: tracers.length > 0 ? tracers[tracers.length - 1] : null
+            latestTracer: tracers.length > 0 ? tracers[tracers.length - 1] : null,
+            shotRngState: (gameState.shotRngState >>> 0) || 0
         };
     },
 
@@ -177,6 +199,16 @@ function round3(value) {
 
 function round4(value) {
     return Math.round(value * 10000) / 10000;
+}
+
+function getFiringConeTightenProgress(gameState, gun) {
+    if (!gun || gun.adsStartedAtMs === null || gun.adsStartedAtMs === undefined) {
+        return 0;
+    }
+    const cfg = (typeof CONFIG !== 'undefined') ? CONFIG : null;
+    const duration = Math.max(1, (cfg && cfg.FIRING_CONE_TIGHTEN_MS) || 2000);
+    const now = gameState.timeMs || 0;
+    return Math.min(1, Math.max(0, (now - gun.adsStartedAtMs) / duration));
 }
 
 if (typeof window !== 'undefined') {

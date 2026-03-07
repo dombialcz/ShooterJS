@@ -71,6 +71,7 @@ const InputSystem = {
         
         const input = player.getComponent('input');
         if (!input) return;
+        const playerState = player.getComponent('playerState');
         
         // Process movement input (WASD)
         let moveX = 0;
@@ -105,6 +106,11 @@ const InputSystem = {
         
         // Process ADS input (right mouse button)
         input.isADS = this.inputState.mouse.buttons.has(2);
+
+        if (playerState) {
+            playerState.isADSActive = input.isADS;
+            playerState.movementSpeedMultiplier = input.isADS ? CONFIG.PLAYER_ADS_SPEED_MULTIPLIER : 1;
+        }
         
         // Update ADS indicator in UI
         if (!options.skipDOM) {

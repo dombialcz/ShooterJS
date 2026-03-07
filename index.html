@@ -50,6 +50,15 @@
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
         }
 
+        #roundTimer {
+            position: absolute;
+            top: 58px;
+            right: 20px;
+            font-size: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            color: #ffe082;
+        }
+
         #editorLink {
             position: absolute;
             top: 20px;
@@ -131,10 +140,11 @@
         <canvas id="gameCanvas" width="1280" height="720"></canvas>
         <div id="ui">
             <div id="score">SCORE: <span id="scoreValue">0</span></div>
+            <div id="roundTimer">TIME: <span id="timerValue">2:00</span></div>
             <a id="editorLink" href="./editor.html">Open Map Editor</a>
             <div id="adsIndicator">ADS ACTIVE</div>
             <div id="gameOver">
-                <h1>ALL TARGETS ELIMINATED</h1>
+                <h1 id="gameOverTitle">TIME'S UP</h1>
                 <p>Final Score: <span id="finalScore">0</span></p>
                 <button id="restartButton">RESTART</button>
             </div>
@@ -166,6 +176,8 @@
 
     <!-- Deterministic Simulation Core -->
     <script src="core/mapBuildUtils.js"></script>
+    <script src="core/roundUtils.js"></script>
+    <script src="core/targetSpawnUtils.js"></script>
     <script src="core/simulationCore.js"></script>
     
     <!-- Game Loop -->
