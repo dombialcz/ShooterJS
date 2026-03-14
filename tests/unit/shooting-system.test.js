@@ -81,4 +81,23 @@ describe('ShootingSystem firing cone', () => {
     expect(player.gun.adsStartedAtMs).toBeNull();
     expect(player.gun.currentSpreadHalfAngleRad).toBeCloseTo(startHalfRad, 6);
   });
+
+  it('uses the held ADS cone state when the release-shot frame fires', () => {
+    const player = makePlayer();
+    const gameState = { timeMs: 0, shotRngState: 0x12345678 };
+
+    player.input.isADS = true;
+    ShootingSystem.updateFiringConeState(gameState, player);
+
+    gameState.timeMs = 1000;
+    ShootingSystem.updateFiringConeState(gameState, player);
+    const halfTightened = player.gun.currentSpreadHalfAngleRad;
+
+    player.input.isShooting = true;
+    const shotAngle = ShootingSystem.getShotAngle(gameState, player);
+    const shotDeviation = Math.abs(shotAngle - player.input.aimAngle);
+
+    expect(shotDeviation).toBeGreaterThan(0);
+    expect(shotDeviation).toBeLessThanOrEqual(halfTightened);
+  });
 });

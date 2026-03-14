@@ -8,6 +8,7 @@ const BlockSystem = {
         this.applyPushers(gameState, dt);
         this.integrateBlocks(gameState, dt);
         this.resolveBlockStacking(gameState);
+        this.resolvePlayerBlockCollisions(gameState);
     },
 
     applyPushers(gameState, dt) {
@@ -40,12 +41,12 @@ const BlockSystem = {
 
                 const pushStrength = (CONFIG.BLOCK_PUSH_FORCE * overlap.penetration) / Math.max(0.2, blockComp.mass);
 
-                blockComp.vx += overlap.normalX * pushStrength * dt;
-                blockComp.vy += overlap.normalY * pushStrength * dt;
+                blockComp.vx -= overlap.normalX * pushStrength * dt;
+                blockComp.vy -= overlap.normalY * pushStrength * dt;
 
                 // Move pusher back slightly to avoid clipping into block body.
-                transform.x -= overlap.normalX * overlap.penetration * 0.55;
-                transform.y -= overlap.normalY * overlap.penetration * 0.55;
+                transform.x += overlap.normalX * overlap.penetration * 0.55;
+                transform.y += overlap.normalY * overlap.penetration * 0.55;
 
                 if (physics) {
                     physics.vx *= 0.86;
@@ -230,5 +231,47 @@ const BlockSystem = {
             normalY: dy / dist,
             penetration: radius - dist
         };
+    },
+
+    resolvePlayerBlockCollisions(gameState) {
+        const player = gameState.player;
+        if (!player) return;
+
+        const transform = player.getComponent('transform');
+        const collision = player.getComponent('collision');
+        if (!transform || !collision || collision.type !== 'circle') {
+            return;
+        }
+
+        const maxIterations = 6;
+        const epsilon = 0.001;
+
+        for (let iteration = 0; iteration < maxIterations; iteration++) {
+            let hadOverlap = false;
+
+            for (const blockEntity of gameState.blocks) {
+                const aabb = this.getBlockAABB(blockEntity);
+                const overlap = this.getCircleAABBOverlap(transform.x, transform.y, collision.radius, aabb);
+                if (!overlap.hit) continue;
+
+                hadOverlap = true;
+                const pushDistance = overlap.penetration + epsilon;
+                transform.x += overlap.normalX * pushDistance;
+                transform.y += overlap.normalY * pushDistance;
+            }
+
+            if (!hadOverlap) break;
+        }
+
+        transform.x = Geometry.clamp(transform.x, collision.radius, CONFIG.CANVAS_WIDTH - collision.radius);
+        transform.y = Geometry.clamp(transform.y, collision.radius, CONFIG.CANVAS_HEIGHT - collision.radius);
+
+        if (typeof MovementSystem !== 'undefined' && MovementSystem && typeof MovementSystem.resolveWallCollisions === 'function') {
+            MovementSystem.resolveWallCollisions(player, gameState.walls || []);
+        }
     }
 };
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = BlockSystem;
+}

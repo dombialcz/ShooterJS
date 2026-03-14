@@ -160,7 +160,8 @@ const SimulationCore = {
             blocks,
             targets: {
                 alive: gameState.targets.length,
-                targetCount: gameState.initialTargetCount || 0
+                targetCount: gameState.initialTargetCount || 0,
+                pendingRespawns: Array.isArray(gameState.pendingTargetRespawns) ? gameState.pendingTargetRespawns.length : 0
             },
             round: {
                 timeRemainingMs: Math.max(0, Math.round(gameState.roundTimeRemainingMs || 0)),

@@ -14,11 +14,13 @@ class GameState {
         this.currentMapData = null;
         this.timeMs = 0;
         this.shotRngState = CONFIG.SHOT_RNG_SEED >>> 0;
+        this.targetRespawnRngState = CONFIG.TARGET_RESPAWN_RNG_SEED >>> 0;
         this.roundDurationMs = CONFIG.ROUND_DURATION_MS;
         this.roundTimeRemainingMs = CONFIG.ROUND_DURATION_MS;
         this.initialTargetCount = 0;
         this.targetSpawnCursor = 0;
         this.targetSpawnPoints = [];
+        this.pendingTargetRespawns = [];
     }
 
     addEntity(entity) {
@@ -46,6 +48,7 @@ class GameState {
         if (entity.type === 'target') {
             const index = this.targets.indexOf(entity);
             if (index > -1) this.targets.splice(index, 1);
+            this.scheduleTargetRespawn();
         } else if (entity.type === 'door') {
             const index = this.doors.indexOf(entity);
             if (index > -1) this.doors.splice(index, 1);
@@ -60,6 +63,27 @@ class GameState {
     addScore(points) {
         this.score += points;
         document.getElementById('scoreValue').textContent = this.score;
+    }
+
+    scheduleTargetRespawn() {
+        if (this.initialTargetCount <= 0 || this.targetSpawnPoints.length <= 0) {
+            return;
+        }
+
+        const minDelay = Math.max(0, CONFIG.TARGET_RESPAWN_DELAY_MIN_MS || 10000);
+        const maxDelay = Math.max(minDelay, CONFIG.TARGET_RESPAWN_DELAY_MAX_MS || 20000);
+        const delay = minDelay + Math.floor(this.nextTargetRespawnRandom() * (maxDelay - minDelay + 1));
+        const readyAtMs = (this.timeMs || 0) + delay;
+        this.pendingTargetRespawns.push({ readyAtMs });
+    }
+
+    nextTargetRespawnRandom() {
+        const a = 1664525;
+        const c = 1013904223;
+        const current = (this.targetRespawnRngState >>> 0) || 0;
+        const next = (Math.imul(current, a) + c) >>> 0;
+        this.targetRespawnRngState = next;
+        return next / 4294967296;
     }
 
     checkGameOver() {
@@ -220,7 +244,8 @@ class Game {
         }));
         this.state.initialTargetCount = this.state.targetSpawnPoints.length;
         this.state.targetSpawnCursor = 0;
-        this.refillTargets();
+        this.state.pendingTargetRespawns = [];
+        this.spawnTargets(this.state.initialTargetCount);
     }
 
     start() {
@@ -280,7 +305,7 @@ class Game {
         this.removeExpiredEntities();
         this.state.checkGameOver();
         if (!this.state.isGameOver) {
-            this.refillTargets();
+            this.processTargetRespawns();
         }
         this.syncHUD();
     }
@@ -322,17 +347,44 @@ class Game {
         return JSON.stringify(SimulationCore.serializeGameState(this.state));
     }
 
-    refillTargets() {
-        const missingCount = Math.max(0, this.state.initialTargetCount - this.state.targets.length);
-        if (missingCount <= 0 || this.state.targetSpawnPoints.length === 0) {
+    processTargetRespawns() {
+        if (!Array.isArray(this.state.pendingTargetRespawns) || this.state.pendingTargetRespawns.length === 0) {
             return;
+        }
+        const now = this.state.timeMs || 0;
+        const dueCount = this.state.pendingTargetRespawns.reduce((count, entry) => (
+            entry.readyAtMs <= now ? count + 1 : count
+        ), 0);
+        if (dueCount <= 0) {
+            return;
+        }
+
+        const spawnedCount = this.spawnTargets(dueCount);
+        if (spawnedCount <= 0) {
+            return;
+        }
+
+        let remainingToRemove = spawnedCount;
+        this.state.pendingTargetRespawns = this.state.pendingTargetRespawns.filter((entry) => {
+            if (remainingToRemove > 0 && entry.readyAtMs <= now) {
+                remainingToRemove -= 1;
+                return false;
+            }
+            return true;
+        });
+    }
+
+    spawnTargets(count) {
+        const desiredCount = Math.max(0, Math.floor(count || 0));
+        if (desiredCount <= 0 || this.state.targetSpawnPoints.length === 0) {
+            return 0;
         }
 
         const targetRadius = CONFIG.TARGET_RADIUS;
         const selection = TargetSpawnUtils.collectSpawnSelections({
             spawnPoints: this.state.targetSpawnPoints,
             startCursor: this.state.targetSpawnCursor,
-            desiredCount: missingCount,
+            desiredCount,
             radius: targetRadius,
             canvasWidth: CONFIG.CANVAS_WIDTH,
             canvasHeight: CONFIG.CANVAS_HEIGHT,
@@ -373,6 +425,7 @@ class Game {
         for (const spawn of selection.selections) {
             this.state.addEntity(createTarget(spawn.x, spawn.y));
         }
+        return selection.selections.length;
     }
 
     getPlayerCircle() {

@@ -8,7 +8,9 @@ const InputSystem = {
             y: 0,
             worldX: 0,
             worldY: 0,
-            buttons: new Set()
+            buttons: new Set(),
+            isLeftHeld: false,
+            releaseShotPending: false
         }
     },
     
@@ -57,11 +59,21 @@ const InputSystem = {
     
     onMouseDown(e) {
         this.inputState.mouse.buttons.add(e.button);
+        if (e.button === 0) {
+            this.inputState.mouse.isLeftHeld = true;
+            this.inputState.mouse.releaseShotPending = false;
+        }
         e.preventDefault();
     },
     
     onMouseUp(e) {
         this.inputState.mouse.buttons.delete(e.button);
+        if (e.button === 0) {
+            if (this.inputState.mouse.isLeftHeld) {
+                this.inputState.mouse.releaseShotPending = true;
+            }
+            this.inputState.mouse.isLeftHeld = false;
+        }
         e.preventDefault();
     },
     
@@ -101,11 +113,14 @@ const InputSystem = {
             this.inputState.mouse.worldY
         );
         
-        // Process shooting input (left mouse button)
-        input.isShooting = this.inputState.mouse.buttons.has(0);
-        
-        // Process ADS input (right mouse button)
-        input.isADS = this.inputState.mouse.buttons.has(2);
+        const mouse = this.inputState.mouse;
+        const shouldFireOnRelease = mouse.releaseShotPending;
+
+        // Left mouse drives the full ADS/fire flow:
+        // hold to ADS, release to fire once, then clear on the next frame.
+        input.isADS = mouse.isLeftHeld || shouldFireOnRelease;
+        input.isShooting = shouldFireOnRelease;
+        mouse.releaseShotPending = false;
 
         if (playerState) {
             playerState.isADSActive = input.isADS;

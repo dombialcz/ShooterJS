@@ -163,4 +163,29 @@ describe('SimulationCore', () => {
     expect(playerState.isADSActive).toBe(false);
     expect(playerState.movementSpeedMultiplier).toBe(1);
   });
+
+  it('preserves the release-shot input pulse across deterministic input frames', () => {
+    const input = { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false };
+    const state = {
+      player: {
+        getComponent(name) {
+          if (name === 'input') return input;
+          return null;
+        }
+      }
+    };
+
+    SimulationCore.applyInputFrame(state, { aimAngle: 0.75, isADS: true, isShooting: false });
+    expect(input.aimAngle).toBeCloseTo(0.75, 4);
+    expect(input.isADS).toBe(true);
+    expect(input.isShooting).toBe(false);
+
+    SimulationCore.applyInputFrame(state, { isADS: true, isShooting: true });
+    expect(input.isADS).toBe(true);
+    expect(input.isShooting).toBe(true);
+
+    SimulationCore.applyInputFrame(state, { isADS: false, isShooting: false });
+    expect(input.isADS).toBe(false);
+    expect(input.isShooting).toBe(false);
+  });
 });

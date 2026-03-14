@@ -5,6 +5,17 @@ async function getState(page) {
   return page.evaluate(() => JSON.parse(window.render_game_to_text()));
 }
 
+async function waitForCanvasPaint(page) {
+  await page.waitForFunction(() => {
+    const canvas = document.getElementById('gameCanvas');
+    if (!canvas) return false;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    const pixel = ctx.getImageData(0, 0, 1, 1).data;
+    return pixel[3] !== 0;
+  });
+}
+
 test.describe('Deterministic gameplay maps', () => {
   test('door push + springback behavior', async ({ page }) => {
     await setActiveMap(page, 'door_push_map');
@@ -12,6 +23,7 @@ test.describe('Deterministic gameplay maps', () => {
     await page.waitForFunction(() => typeof window.advanceTime === 'function');
 
     await page.evaluate(() => window.advanceTime(32));
+    await waitForCanvasPaint(page);
     await expect(page).toHaveScreenshot('door_push_start.png');
 
     const startState = await getState(page);
@@ -28,6 +40,7 @@ test.describe('Deterministic gameplay maps', () => {
     const settledState = await getState(page);
     expect(Math.abs(settledState.doors[0].currentAngle)).toBeLessThan(Math.abs(pushedState.doors[0].currentAngle));
 
+    await waitForCanvasPaint(page);
     await expect(page).toHaveScreenshot('door_push_end.png');
   });
 
@@ -37,6 +50,7 @@ test.describe('Deterministic gameplay maps', () => {
     await page.waitForFunction(() => typeof window.advanceTime === 'function');
 
     await page.evaluate(() => window.advanceTime(32));
+    await waitForCanvasPaint(page);
     await expect(page).toHaveScreenshot('block_push_start.png');
 
     const stateA = await getState(page);
@@ -55,7 +69,92 @@ test.describe('Deterministic gameplay maps', () => {
     expect(firstBlockB.x).toBeGreaterThan(firstBlockA.x + 1);
     expect(firstBlockB.aabb.x + firstBlockB.aabb.w).toBeLessThanOrEqual(secondBlockB.aabb.x + 0.5);
 
+    await waitForCanvasPaint(page);
     await expect(page).toHaveScreenshot('block_push_end.png');
+  });
+
+  test('player is not trapped inside pushable blocks after sustained push', async ({ page }) => {
+    await setActiveMap(page, 'block_push_map');
+    await page.goto('/index.html');
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+
+    const result = await page.evaluate(() => {
+      function overlapCircleAABB(cx, cy, radius, aabb) {
+        const closestX = Math.max(aabb.x, Math.min(cx, aabb.x + aabb.w));
+        const closestY = Math.max(aabb.y, Math.min(cy, aabb.y + aabb.h));
+        const dx = cx - closestX;
+        const dy = cy - closestY;
+        return dx * dx + dy * dy < radius * radius;
+      }
+
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 1,
+          moveY: 0,
+          aimAngle: 0,
+          isADS: false,
+          isShooting: false
+        }
+      });
+
+      window.advanceTime(2200, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 1,
+          moveY: 0,
+          aimAngle: 0,
+          isADS: false,
+          isShooting: false
+        }
+      });
+
+      const afterPush = JSON.parse(window.render_game_to_text());
+      const pushedX = afterPush.player.x;
+      const playerRadius = 10;
+      const overlappedAfterPush = afterPush.blocks.some((block) => overlapCircleAABB(afterPush.player.x, afterPush.player.y, playerRadius, block.aabb));
+
+      window.advanceTime(700, {
+        skipInput: true,
+        inputFrame: {
+          moveX: -1,
+          moveY: 0,
+          aimAngle: 0,
+          isADS: false,
+          isShooting: false
+        }
+      });
+
+      const afterEscape = JSON.parse(window.render_game_to_text());
+      const escapedX = afterEscape.player.x;
+      const overlappedAfterEscape = afterEscape.blocks.some((block) => overlapCircleAABB(afterEscape.player.x, afterEscape.player.y, playerRadius, block.aabb));
+
+      window.advanceTime(500, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 0,
+          moveY: 0,
+          aimAngle: 0,
+          isADS: false,
+          isShooting: false
+        }
+      });
+      const settled = JSON.parse(window.render_game_to_text());
+      const overlappedSettled = settled.blocks.some((block) => overlapCircleAABB(settled.player.x, settled.player.y, playerRadius, block.aabb));
+
+      return {
+        pushedX,
+        escapedX,
+        overlappedAfterPush,
+        overlappedAfterEscape,
+        overlappedSettled
+      };
+    });
+
+    expect(result.escapedX).toBeLessThan(result.pushedX - 5);
+    expect(result.overlappedAfterPush).toBe(false);
+    expect(result.overlappedAfterEscape).toBe(false);
+    expect(result.overlappedSettled).toBe(false);
   });
 
   test('occlusion ordering: block then door then wall', async ({ page }) => {
@@ -68,17 +167,24 @@ test.describe('Deterministic gameplay maps', () => {
       const player = state.player;
       const transform = player.getComponent('transform');
       const target = state.targets[0].getComponent('transform');
-      const input = player.getComponent('input');
       const gun = player.getComponent('gun');
+      const angle = Math.atan2(target.y - transform.y, target.x - transform.x);
 
-      input.aimAngle = Math.atan2(target.y - transform.y, target.x - transform.x);
-      input.isADS = true;
-      input.isShooting = true;
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: {
+          aimAngle: angle,
+          isADS: true,
+          isShooting: false,
+          moveX: 0,
+          moveY: 0
+        }
+      });
       gun.lastShotTime = -1e9;
       window.advanceTime(32, {
         skipInput: true,
         inputFrame: {
-          aimAngle: input.aimAngle,
+          aimAngle: angle,
           isADS: true,
           isShooting: true,
           moveX: 0,
@@ -107,6 +213,16 @@ test.describe('Deterministic gameplay maps', () => {
       const target = state.targets[0].getComponent('transform');
       const angle = Math.atan2(target.y - transform.y, target.x - transform.x);
       const gun = player.getComponent('gun');
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: {
+          aimAngle: angle,
+          isADS: true,
+          isShooting: false,
+          moveX: 0,
+          moveY: 0
+        }
+      });
       gun.lastShotTime = -1e9;
       window.advanceTime(32, {
         skipInput: true,
@@ -138,6 +254,16 @@ test.describe('Deterministic gameplay maps', () => {
       const target = state.targets[0].getComponent('transform');
       const angle = Math.atan2(target.y - transform.y, target.x - transform.x);
       const gun = player.getComponent('gun');
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: {
+          aimAngle: angle,
+          isADS: true,
+          isShooting: false,
+          moveX: 0,
+          moveY: 0
+        }
+      });
       gun.lastShotTime = -1e9;
       window.advanceTime(32, {
         skipInput: true,
@@ -155,6 +281,7 @@ test.describe('Deterministic gameplay maps', () => {
     const thirdHitX = hit3.latestTracer.x2;
     expect(thirdHitX).toBeGreaterThan(secondHitX + 10);
 
+    await waitForCanvasPaint(page);
     await expect(page).toHaveScreenshot('occlusion_end.png');
   });
 
@@ -185,6 +312,7 @@ test.describe('Deterministic gameplay maps', () => {
       });
     });
 
+    await waitForCanvasPaint(page);
     await expect(page).toHaveScreenshot('firing_cone_wide.png');
 
     const firstDeviation = await page.evaluate(() => {
@@ -230,6 +358,7 @@ test.describe('Deterministic gameplay maps', () => {
       });
     });
 
+    await waitForCanvasPaint(page);
     await expect(page).toHaveScreenshot('firing_cone_tight.png');
 
     const secondDeviation = await page.evaluate(() => {
@@ -334,7 +463,7 @@ test.describe('Deterministic gameplay maps', () => {
     expect(distances.adsDistance).toBeLessThan(distances.normalDistance * 0.7);
   });
 
-  test('destroyed targets are refilled back to the intended concurrent count', async ({ page }) => {
+  test('destroyed targets respawn after a delayed 10-20s window', async ({ page }) => {
     await setActiveMap(page, 'smoke_default_map');
     await page.goto('/index.html');
     await page.waitForFunction(() => typeof window.advanceTime === 'function');
@@ -350,6 +479,17 @@ test.describe('Deterministic gameplay maps', () => {
       const targetTransform = state.targets[0].getComponent('transform');
 
       input.aimAngle = Math.atan2(targetTransform.y - transform.y, targetTransform.x - transform.x);
+
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 0,
+          moveY: 0,
+          aimAngle: input.aimAngle,
+          isADS: true,
+          isShooting: false
+        }
+      });
       gun.lastShotTime = -1e9;
 
       window.advanceTime(32, {
@@ -363,19 +503,52 @@ test.describe('Deterministic gameplay maps', () => {
         }
       });
 
-      const afterIds = state.targets.map((target) => target.id).sort((a, b) => a - b);
+      const afterShotIds = state.targets.map((target) => target.id).sort((a, b) => a - b);
+      const pendingAfterShot = state.pendingTargetRespawns.length;
+
+      window.advanceTime(9000, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 0,
+          moveY: 0,
+          aimAngle: input.aimAngle,
+          isADS: false,
+          isShooting: false
+        }
+      });
+
+      const aliveAt9s = state.targets.length;
+
+      window.advanceTime(12000, {
+        skipInput: true,
+        inputFrame: {
+          moveX: 0,
+          moveY: 0,
+          aimAngle: input.aimAngle,
+          isADS: false,
+          isShooting: false
+        }
+      });
+
+      const afterDelayIds = state.targets.map((target) => target.id).sort((a, b) => a - b);
       return {
         beforeIds,
-        afterIds,
+        afterShotIds,
+        afterDelayIds,
         score: state.score,
-        alive: state.targets.length,
-        targetCount: state.initialTargetCount
+        aliveAt9s,
+        aliveAfterDelay: state.targets.length,
+        targetCount: state.initialTargetCount,
+        pendingAfterShot
       };
     });
 
     expect(result.score).toBe(10);
-    expect(result.alive).toBe(result.targetCount);
-    expect(result.beforeIds).not.toEqual(result.afterIds);
+    expect(result.pendingAfterShot).toBe(1);
+    expect(result.afterShotIds.length).toBe(result.targetCount - 1);
+    expect(result.aliveAt9s).toBe(result.targetCount - 1);
+    expect(result.aliveAfterDelay).toBe(result.targetCount);
+    expect(result.beforeIds).not.toEqual(result.afterDelayIds);
   });
 
   test('time trial ends exactly when the countdown expires', async ({ page }) => {

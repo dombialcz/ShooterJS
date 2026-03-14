@@ -36,3 +36,17 @@ Original prompt: Implement plan to add grid map editor + pushable blocks, includ
 - Added deterministic target spawn validation/refill helpers so targets only spawn on valid map `targetSpawns` and refill back toward the intended concurrent count without random placement.
 - Extended serialized state with `round` data and `targets.targetCount`, plus added unit/e2e coverage for spawn validity, refill behavior, and exact timer expiry.
 - Validation: `npm run test` passed after time-trial and target refill changes.
+- Reworked gunplay input so left mouse now owns the full ADS/fire cycle: hold to tighten ADS, release to fire once, right mouse ignored.
+- Preserved deterministic input interfaces (`isADS`, `isShooting`) while changing semantics to a release-shot pulse for tests and `advanceTime` frames.
+- Updated unit + e2e coverage for the new release-frame contract and added a canvas-paint wait helper to stabilize screenshot assertions before baseline capture.
+- Validation: `npm run test` passed after the left-hold ADS / release-to-fire change.
+- Attempted `develop-web-game` skill client and a direct Playwright browser probe again; both are still blocked in this environment by Playwright module-resolution/sandbox launch restrictions outside the project test runner.
+- Added delayed target respawns: target kills now enqueue deterministic random respawn times between 10s and 20s instead of immediate refill.
+- Added respawn tuning/seed config (`TARGET_RESPAWN_DELAY_MIN_MS`, `TARGET_RESPAWN_DELAY_MAX_MS`, `TARGET_RESPAWN_RNG_SEED`) and serialized `targets.pendingRespawns` for deterministic text-state visibility.
+- Updated gameplay e2e coverage to assert delayed respawn behavior (not present at 9s, restored by 21s) and revalidated full suite.
+- Validation: `npm run test` passed (unit + e2e).
+- Fixed player trapping in pushable green blocks by adding deterministic post-block player-vs-block depenetration with bounded iterations.
+- Corrected block push vector direction and pusher separation direction so blocks are pushed away from player contact consistently.
+- Added unit coverage for block depenetration and e2e regression coverage for sustained-push anti-trap behavior.
+- Relaxed smoke countdown assertion to a bounded deterministic window to avoid single-ms rounding flake.
+- Validation: `npm run test` passed (unit + e2e).
