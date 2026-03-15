@@ -13,6 +13,7 @@ Fields:
 - `doors` array of `{ col, row, orientation, hingeSide }`
 - `playerSpawn`
 - `targetSpawns`
+- `enemies` (optional array of enemy spawn/combat descriptors)
 
 Tile values:
 - `0`: empty
@@ -50,6 +51,9 @@ Tools:
 - erase
 - player spawn
 - target spawn
+- enemy melee spawn
+- enemy ranged spawn
+- patrol waypoint authoring (select enemy, then place/remove waypoints)
 
 Door placement controls:
 - Orientation selector

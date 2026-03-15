@@ -6,12 +6,15 @@ This file summarizes behavior and coupling between gameplay systems.
 Current step pipeline (through `SimulationCore`):
 1. `InputSystem`
 2. `AimingSystem`
-3. `MovementSystem`
-4. `DoorSystem`
-5. `BlockSystem`
-6. wall correction pass (`MovementSystem.resolveWallCollisions` for player)
-7. `VisionSystem`
-8. `ShootingSystem`
+3. `EnemyPerceptionSystem`
+4. `EnemyBehaviorSystem`
+5. `MovementSystem`
+6. `DoorSystem`
+7. `BlockSystem`
+8. wall correction pass (`MovementSystem.resolveWallCollisions` for player)
+9. `VisionSystem`
+10. `ShootingSystem`
+11. `EnemyCombatSystem`
 
 Order matters for interactions and tests.
 
@@ -50,6 +53,12 @@ Order matters for interactions and tests.
 - Checks intersections with walls, doors, blocks, then targets.
 - Uses `gameState.timeMs` for fire-rate timing in deterministic tests.
 - Spawns tracer/hitmarker effects with simulation-time-based lifetimes.
+
+### EnemyPerceptionSystem / EnemyBehaviorSystem / EnemyCombatSystem (`systems/enemy*.js`)
+- Enemies remain idle/patrolling until they gain LOS to player.
+- Melee enemies close distance and deal contact damage.
+- Ranged enemies fire with deterministic miss policy (first miss, then 50% miss chance).
+- Path-following uses deterministic grid A* when direct LOS pathing is blocked.
 
 ### RenderSystem (`systems/renderSystem.js`)
 - Draws world layers in fixed order.
