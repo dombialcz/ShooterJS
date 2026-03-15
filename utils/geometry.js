@@ -97,3 +97,11 @@ const Geometry = {
         return angle;
     }
 };
+
+if (typeof window !== 'undefined') {
+    window.Geometry = Geometry;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Geometry;
+}

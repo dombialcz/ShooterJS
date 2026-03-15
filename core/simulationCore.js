@@ -10,11 +10,14 @@ const SimulationCore = {
         const systems = options.systems || {
             InputSystem,
             AimingSystem,
+            EnemyPerceptionSystem,
+            EnemyBehaviorSystem,
             MovementSystem,
             DoorSystem,
             BlockSystem,
             VisionSystem,
-            ShootingSystem
+            ShootingSystem,
+            EnemyCombatSystem
         };
 
         if (options.inputFrame) {
@@ -28,6 +31,8 @@ const SimulationCore = {
         }
 
         if (systems.AimingSystem) systems.AimingSystem.update(gameState, dt);
+        if (systems.EnemyPerceptionSystem) systems.EnemyPerceptionSystem.update(gameState, dt);
+        if (systems.EnemyBehaviorSystem) systems.EnemyBehaviorSystem.update(gameState, dt);
         if (systems.MovementSystem) systems.MovementSystem.update(gameState, dt);
         if (systems.DoorSystem) systems.DoorSystem.update(gameState, dt);
         if (systems.BlockSystem) systems.BlockSystem.update(gameState, dt);
@@ -38,6 +43,7 @@ const SimulationCore = {
 
         if (systems.VisionSystem) systems.VisionSystem.update(gameState, dt);
         if (systems.ShootingSystem) systems.ShootingSystem.update(gameState, dt);
+        if (systems.EnemyCombatSystem) systems.EnemyCombatSystem.update(gameState, dt);
 
         return gameState;
     },
@@ -69,6 +75,7 @@ const SimulationCore = {
         const playerInput = player ? player.getComponent('input') : null;
         const playerGun = player ? player.getComponent('gun') : null;
         const playerState = player ? player.getComponent('playerState') : null;
+        const playerHealth = player ? player.getComponent('health') : null;
 
         const doors = gameState.doors
             .map((doorEntity) => {
@@ -108,6 +115,42 @@ const SimulationCore = {
             .filter(Boolean)
             .sort((a, b) => a.id - b.id);
 
+        const enemies = (gameState.enemies || [])
+            .map((enemyEntity) => {
+                const transform = enemyEntity.getComponent('transform');
+                const health = enemyEntity.getComponent('health');
+                const enemy = enemyEntity.getComponent('enemy');
+                if (!transform || !enemy) return null;
+
+                return {
+                    id: enemyEntity.id,
+                    sourceId: enemy.sourceId || null,
+                    type: enemy.type,
+                    x: round2(transform.x),
+                    y: round2(transform.y),
+                    state: enemy.state,
+                    alerted: Boolean(enemy.isAlerted),
+                    hasLineOfSight: Boolean(enemy.hasLineOfSight),
+                    health: health
+                        ? { current: round2(health.current), max: round2(health.max) }
+                        : null,
+                    combat: {
+                        lastAttackAtMs: Number.isFinite(enemy.lastAttackAtMs) ? Math.round(enemy.lastAttackAtMs) : null,
+                        firstShotMustMiss: Boolean(enemy.firstShotMustMiss),
+                        pendingAttack: Boolean(enemy.pendingAttack),
+                        rngState: (enemy.shotRngState >>> 0) || 0
+                    },
+                    patrol: Array.isArray(enemy.patrol)
+                        ? enemy.patrol.map((point) => ({ x: round2(point.x), y: round2(point.y) }))
+                        : [],
+                    path: Array.isArray(enemy.currentPath)
+                        ? enemy.currentPath.map((point) => ({ x: round2(point.x), y: round2(point.y) }))
+                        : []
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.id - b.id);
+
         const tracers = [];
         for (const entity of gameState.entities.values()) {
             if (entity.type !== 'tracer') continue;
@@ -139,6 +182,12 @@ const SimulationCore = {
                     vx: playerPhysics ? round3(playerPhysics.vx) : 0,
                     vy: playerPhysics ? round3(playerPhysics.vy) : 0,
                     movementSpeedMultiplier: playerState ? round3(playerState.movementSpeedMultiplier || 1) : 1,
+                    health: playerHealth
+                        ? {
+                            current: round2(playerHealth.current),
+                            max: round2(playerHealth.max)
+                        }
+                        : null,
                     input: playerInput
                         ? {
                             moveX: round3(playerInput.moveX),
@@ -158,18 +207,23 @@ const SimulationCore = {
                 : null,
             doors,
             blocks,
+            enemies,
             targets: {
                 alive: gameState.targets.length,
                 targetCount: gameState.initialTargetCount || 0,
                 pendingRespawns: Array.isArray(gameState.pendingTargetRespawns) ? gameState.pendingTargetRespawns.length : 0,
                 destroyed: gameState.targetsDestroyed || 0,
-                goal: Number.isFinite(gameState.levelGoalTargets) ? gameState.levelGoalTargets : null
+                goal: Number.isFinite(gameState.levelGoalTargets) ? gameState.levelGoalTargets : null,
+                enemiesAlive: (gameState.enemies || []).length,
+                enemiesDestroyed: gameState.enemiesDestroyed || 0,
+                eliminations: ((gameState.targetsDestroyed || 0) + (gameState.enemiesDestroyed || 0))
             },
             round: {
                 timeRemainingMs: Math.max(0, Math.round(gameState.roundTimeRemainingMs || 0)),
                 durationMs: Math.max(0, Math.round(gameState.roundDurationMs || 0)),
                 isExpired: Boolean((gameState.roundTimeRemainingMs || 0) <= 0 || gameState.isGameOver),
-                isLevelComplete: Boolean(gameState.isLevelComplete)
+                isLevelComplete: Boolean(gameState.isLevelComplete),
+                gameOverReason: gameState.gameOverReason || null
             },
             score: gameState.score,
             isGameOver: gameState.isGameOver,

@@ -17,6 +17,9 @@ const RenderSystem = {
         
         // Draw targets
         this.drawTargets(ctx, gameState);
+
+        // Draw enemies
+        this.drawEnemies(ctx, gameState);
         
         // Draw tracer lines (bullet tracers)
         this.drawTracers(ctx, gameState);
@@ -122,6 +125,47 @@ const RenderSystem = {
             ctx.beginPath();
             ctx.arc(transform.x, transform.y, r * 0.15, 0, Math.PI * 2);
             ctx.fill();
+        }
+    },
+
+    drawEnemies(ctx, gameState) {
+        if (!Array.isArray(gameState.enemies)) return;
+
+        for (const enemyEntity of gameState.enemies) {
+            const transform = enemyEntity.getComponent('transform');
+            const renderable = enemyEntity.getComponent('renderable');
+            const enemy = enemyEntity.getComponent('enemy');
+            const health = enemyEntity.getComponent('health');
+            if (!transform || !renderable || !enemy || !health) continue;
+
+            ctx.fillStyle = renderable.color;
+            ctx.beginPath();
+            ctx.arc(transform.x, transform.y, renderable.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = enemy.type === 'ranged' ? '#ffdeb8' : '#d7ffd0';
+            ctx.lineWidth = 2;
+            if (enemy.type === 'ranged') {
+                ctx.strokeRect(transform.x - 9, transform.y - 9, 18, 18);
+            } else {
+                ctx.beginPath();
+                ctx.moveTo(transform.x - 8, transform.y - 8);
+                ctx.lineTo(transform.x + 8, transform.y + 8);
+                ctx.moveTo(transform.x + 8, transform.y - 8);
+                ctx.lineTo(transform.x - 8, transform.y + 8);
+                ctx.stroke();
+            }
+
+            const healthRatio = Math.max(0, Math.min(1, health.max > 0 ? health.current / health.max : 0));
+            const barWidth = 24;
+            const barHeight = 4;
+            const barX = transform.x - barWidth / 2;
+            const barY = transform.y - renderable.size - 10;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+            ctx.fillStyle = healthRatio > 0.5 ? '#9df58b' : (healthRatio > 0.2 ? '#ffcf66' : '#ff6f6f');
+            ctx.fillRect(barX, barY, barWidth * healthRatio, barHeight);
         }
     },
 

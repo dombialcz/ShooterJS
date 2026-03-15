@@ -1,6 +1,48 @@
 const { test, expect } = require('@playwright/test');
 const { setActiveMap, selectFirstLevel } = require('../helpers/mapFixtures');
 
+function makeOpenEnemyMap(name = 'enemy-test') {
+  const cols = 32;
+  const rows = 18;
+  const tiles = new Array(cols * rows).fill(0);
+  for (let col = 0; col < cols; col++) {
+    tiles[col] = 1;
+    tiles[(rows - 1) * cols + col] = 1;
+  }
+  for (let row = 0; row < rows; row++) {
+    tiles[row * cols] = 1;
+    tiles[row * cols + (cols - 1)] = 1;
+  }
+  return {
+    version: 1,
+    meta: { name },
+    settings: { timeLimitMs: 120000, maxTargetsToKill: 1 },
+    tileSize: 40,
+    cols,
+    rows,
+    tiles,
+    doors: [],
+    playerSpawn: { col: 4, row: 9 },
+    targetSpawns: [],
+    enemies: []
+  };
+}
+
+async function setInlineMap(page, map, id = 'inline-level') {
+  await page.addInitScript(({ payload, levelId }) => {
+    window.__testLevelCatalog = [
+      {
+        id: levelId,
+        name: levelId,
+        path: `${levelId}.json`
+      }
+    ];
+    window.__testLevelMaps = {
+      [levelId]: payload
+    };
+  }, { payload: map, levelId: id });
+}
+
 async function getState(page) {
   return page.evaluate(() => JSON.parse(window.render_game_to_text()));
 }
@@ -35,7 +77,6 @@ test.describe('Deterministic gameplay maps', () => {
     await page.goto('/index.html');
     await selectFirstLevel(page);
     await page.waitForFunction(() => typeof window.advanceTime === 'function');
-
     await page.evaluate(() => window.advanceTime(32));
     await waitForCanvasPaint(page);
     await expect(page).toHaveScreenshot('door_push_start.png');
@@ -620,5 +661,218 @@ test.describe('Deterministic gameplay maps', () => {
 
     expect(result.round.isLevelComplete).toBe(true);
     expect(result.isGameOver).toBe(true);
+  });
+
+  test('enemy stays idle without LOS and alerts after LOS is restored', async ({ page }) => {
+    const map = makeOpenEnemyMap('enemy-los-gate');
+    map.settings.maxTargetsToKill = 1;
+    for (let row = 7; row <= 11; row++) {
+      map.tiles[row * map.cols + 7] = 1;
+    }
+    map.enemies = [
+      {
+        id: 'enemy-1',
+        type: 'melee',
+        spawn: { col: 10, row: 9 },
+        visionRange: 600
+      }
+    ];
+
+    await setInlineMap(page, map, 'enemy-los-gate');
+    await page.goto('/index.html');
+    await selectFirstLevel(page);
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+
+    const before = await page.evaluate(() => {
+      window.advanceTime(1200, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false }
+      });
+      return JSON.parse(window.render_game_to_text());
+    });
+    expect(before.enemies[0].alerted).toBe(false);
+
+    const after = await page.evaluate(() => {
+      const state = window.game.state;
+      for (const entity of [...state.entities.values()]) {
+        if (entity.type === 'wall') {
+          state.entities.delete(entity.id);
+        }
+      }
+      state.walls = [];
+      window.advanceTime(300, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false }
+      });
+      return JSON.parse(window.render_game_to_text());
+    });
+    expect(after.enemies[0].alerted).toBe(true);
+  });
+
+  test('melee enemy chases and can kill player', async ({ page }) => {
+    const map = makeOpenEnemyMap('enemy-melee-kill');
+    map.enemies = [
+      {
+        id: 'enemy-1',
+        type: 'melee',
+        spawn: { col: 7, row: 9 },
+        attackCooldownMs: 400,
+        damage: 20,
+        moveSpeed: 145,
+        attackRange: 140
+      }
+    ];
+
+    await setInlineMap(page, map, 'enemy-melee-kill');
+    await page.goto('/index.html');
+    await selectFirstLevel(page);
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+    const snapshot = await page.evaluate(() => {
+      window.advanceTime(7000, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false }
+      });
+      return JSON.parse(window.render_game_to_text());
+    });
+
+    expect(snapshot.isGameOver).toBe(true);
+    expect(snapshot.round.gameOverReason).toBe('player_dead');
+    expect(snapshot.player.health.current).toBe(0);
+  });
+
+  test('ranged enemy first shot misses, later shots can hit deterministically', async ({ page }) => {
+    const map = makeOpenEnemyMap('enemy-ranged-miss');
+    map.enemies = [
+      {
+        id: 'enemy-1',
+        type: 'ranged',
+        spawn: { col: 10, row: 9 },
+        attackCooldownMs: 900,
+        damage: 8,
+        attackRange: 500
+      }
+    ];
+
+    await setInlineMap(page, map, 'enemy-ranged-miss');
+    await page.goto('/index.html');
+    await selectFirstLevel(page);
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+
+    const firstWindow = await page.evaluate(() => {
+      window.advanceTime(1700, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false }
+      });
+      return JSON.parse(window.render_game_to_text());
+    });
+    expect(firstWindow.player.health.current).toBe(100);
+
+    const secondWindow = await page.evaluate(() => {
+      window.advanceTime(9000, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false }
+      });
+      return JSON.parse(window.render_game_to_text());
+    });
+    expect(secondWindow.player.health.current).toBeLessThan(100);
+  });
+
+  test('enemy elimination counts toward level completion goal', async ({ page }) => {
+    const map = makeOpenEnemyMap('enemy-goal');
+    map.settings.maxTargetsToKill = 1;
+    map.enemies = [
+      {
+        id: 'enemy-1',
+        type: 'ranged',
+        spawn: { col: 7, row: 9 },
+        maxHealth: 15,
+        attackCooldownMs: 3000
+      }
+    ];
+
+    await setInlineMap(page, map, 'enemy-goal');
+    await page.goto('/index.html');
+    await selectFirstLevel(page);
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+
+    const snapshot = await page.evaluate(() => {
+      const state = window.game.state;
+      const player = state.player;
+      const transform = player.getComponent('transform');
+      const gun = player.getComponent('gun');
+      const enemyTransform = state.enemies[0].getComponent('transform');
+      const angle = Math.atan2(enemyTransform.y - transform.y, enemyTransform.x - transform.x);
+      gun.currentSpreadHalfAngleRad = 0;
+      gun.adsStartedAtMs = state.timeMs || 0;
+
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: angle, isADS: true, isShooting: false }
+      });
+      gun.lastShotTime = -1e9;
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: angle, isADS: true, isShooting: true }
+      });
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: angle, isADS: false, isShooting: false }
+      });
+      return JSON.parse(window.render_game_to_text());
+    });
+
+    expect(snapshot.targets.eliminations).toBe(1);
+    expect(snapshot.round.isLevelComplete).toBe(true);
+    expect(snapshot.isGameOver).toBe(true);
+  });
+
+  test('patrolling enemy follows waypoints then transitions to alert state on sighting player', async ({ page }) => {
+    const map = makeOpenEnemyMap('enemy-patrol');
+    map.playerSpawn = { col: 2, row: 2 };
+    map.settings.maxTargetsToKill = 2;
+    map.enemies = [
+      {
+        id: 'enemy-1',
+        type: 'ranged',
+        spawn: { col: 24, row: 9 },
+        visionRange: 420,
+        patrol: [
+          { col: 24, row: 5 },
+          { col: 27, row: 9 },
+          { col: 24, row: 13 },
+          { col: 21, row: 9 }
+        ]
+      }
+    ];
+
+    await setInlineMap(page, map, 'enemy-patrol');
+    await page.goto('/index.html');
+    await selectFirstLevel(page);
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+
+    const patrolState = await page.evaluate(() => {
+      window.advanceTime(1200, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false }
+      });
+      return JSON.parse(window.render_game_to_text());
+    });
+    expect(patrolState.enemies[0].state).toBe('patrolling');
+    expect(Math.abs(patrolState.enemies[0].y - (9 * 40 + 20))).toBeGreaterThan(1);
+
+    const alertedState = await page.evaluate(() => {
+      const state = window.game.state;
+      const enemy = state.enemies[0].getComponent('transform');
+      const player = state.player.getComponent('transform');
+      player.x = enemy.x - 80;
+      player.y = enemy.y;
+      window.advanceTime(400, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false }
+      });
+      return JSON.parse(window.render_game_to_text());
+    });
+    expect(alertedState.enemies[0].alerted).toBe(true);
+    expect(alertedState.enemies[0].state).not.toBe('patrolling');
   });
 });

@@ -12,6 +12,7 @@ class GameState {
         this.doors = [];
         this.targets = [];
         this.blocks = [];
+        this.enemies = [];
         this.currentMapData = null;
         this.timeMs = 0;
         this.shotRngState = CONFIG.SHOT_RNG_SEED >>> 0;
@@ -24,6 +25,9 @@ class GameState {
         this.pendingTargetRespawns = [];
         this.levelGoalTargets = 0;
         this.targetsDestroyed = 0;
+        this.enemiesDestroyed = 0;
+        this.initialEnemyCount = 0;
+        this.gameOverReason = null;
         this.hasDisplayedGameOver = false;
     }
 
@@ -40,6 +44,8 @@ class GameState {
             this.targets.push(entity);
         } else if (entity.type === 'block') {
             this.blocks.push(entity);
+        } else if (entity.type === 'enemy') {
+            this.enemies.push(entity);
         }
 
         return entity;
@@ -59,6 +65,9 @@ class GameState {
         } else if (entity.type === 'block') {
             const index = this.blocks.indexOf(entity);
             if (index > -1) this.blocks.splice(index, 1);
+        } else if (entity.type === 'enemy') {
+            const index = this.enemies.indexOf(entity);
+            if (index > -1) this.enemies.splice(index, 1);
         }
 
         this.entities.delete(entityId);
@@ -97,6 +106,7 @@ class GameState {
         if (this.roundTimeRemainingMs <= 0 && !this.isGameOver) {
             this.isGameOver = true;
             this.isLevelComplete = false;
+            this.gameOverReason = this.gameOverReason || 'timeout';
         }
 
         if (this.isGameOver && !this.hasDisplayedGameOver) {
@@ -106,13 +116,23 @@ class GameState {
             }
             const title = document.getElementById('gameOverTitle');
             if (title) {
-                title.textContent = this.isLevelComplete ? 'LEVEL COMPLETE' : "TIME'S UP";
+                if (this.isLevelComplete) {
+                    title.textContent = 'LEVEL COMPLETE';
+                } else if (this.gameOverReason === 'player_dead') {
+                    title.textContent = 'YOU DIED';
+                } else {
+                    title.textContent = "TIME'S UP";
+                }
             }
             const result = document.getElementById('gameOverResult');
             if (result) {
-                result.textContent = this.isLevelComplete
-                    ? 'You won this level.'
-                    : 'You lost this level.';
+                if (this.isLevelComplete) {
+                    result.textContent = 'You won this level.';
+                } else if (this.gameOverReason === 'player_dead') {
+                    result.textContent = 'You were eliminated by an enemy.';
+                } else {
+                    result.textContent = 'You lost this level.';
+                }
             }
             const gameOver = document.getElementById('gameOver');
             if (gameOver) {
@@ -120,6 +140,10 @@ class GameState {
             }
             this.hasDisplayedGameOver = true;
         }
+    }
+
+    getTotalEliminations() {
+        return (this.targetsDestroyed || 0) + (this.enemiesDestroyed || 0);
     }
 
     getAllWallSegments() {
@@ -175,6 +199,8 @@ class Game {
         this.initializeMap();
         this.createPlayerFromMap();
         this.createTargets();
+        this.createEnemies();
+        this.configureLevelGoal();
         this.syncHUD();
 
         InputSystem.init(this.canvas, this.state);
@@ -185,6 +211,7 @@ class Game {
         console.log(`Doors: ${this.state.doors.length}`);
         console.log(`Blocks: ${this.state.blocks.length}`);
         console.log(`Targets: ${this.state.targets.length}`);
+        console.log(`Enemies: ${this.state.enemies.length}`);
     }
 
     initializeMap() {
@@ -249,17 +276,43 @@ class Game {
         }));
         this.state.initialTargetCount = this.state.targetSpawnPoints.length;
         this.state.targetsDestroyed = 0;
-        const configuredGoal = mapData.settings?.maxTargetsToKill;
-        if (Number.isInteger(configuredGoal) && configuredGoal > 0) {
-            this.state.levelGoalTargets = configuredGoal;
-        } else if (this.state.initialTargetCount > 0) {
-            this.state.levelGoalTargets = this.state.initialTargetCount;
-        } else {
-            this.state.levelGoalTargets = Number.POSITIVE_INFINITY;
-        }
         this.state.targetSpawnCursor = 0;
         this.state.pendingTargetRespawns = [];
         this.spawnTargets(this.state.initialTargetCount);
+    }
+
+    createEnemies() {
+        const mapData = this.state.currentMapData;
+        const tile = mapData.tileSize;
+        const enemies = Array.isArray(mapData.enemies) ? mapData.enemies : [];
+        this.state.enemiesDestroyed = 0;
+        this.state.initialEnemyCount = enemies.length;
+
+        for (const enemyData of enemies) {
+            const spawn = enemyData?.spawn;
+            if (!spawn || !Number.isInteger(spawn.col) || !Number.isInteger(spawn.row)) continue;
+            const x = spawn.col * tile + tile / 2;
+            const y = spawn.row * tile + tile / 2;
+            const patrol = Array.isArray(enemyData.patrol)
+                ? enemyData.patrol.map((point) => ({
+                    x: point.col * tile + tile / 2,
+                    y: point.row * tile + tile / 2
+                }))
+                : [];
+            this.state.addEntity(createEnemy(x, y, Object.assign({}, enemyData, { patrol })));
+        }
+    }
+
+    configureLevelGoal() {
+        const configuredGoal = this.state.currentMapData?.settings?.maxTargetsToKill;
+        const availableEliminations = this.state.initialTargetCount + this.state.initialEnemyCount;
+        if (Number.isInteger(configuredGoal) && configuredGoal > 0) {
+            this.state.levelGoalTargets = configuredGoal;
+        } else if (availableEliminations > 0) {
+            this.state.levelGoalTargets = availableEliminations;
+        } else {
+            this.state.levelGoalTargets = Number.POSITIVE_INFINITY;
+        }
     }
 
     start() {
@@ -317,9 +370,16 @@ class Game {
         this.state.roundTimeRemainingMs = RoundUtils.getRemainingMs(this.state.timeMs, this.state.roundDurationMs);
 
         this.removeExpiredEntities();
-        if (this.state.targetsDestroyed >= this.state.levelGoalTargets) {
+        const playerHealth = this.state.player?.getComponent('health');
+        if (!this.state.isGameOver && playerHealth && playerHealth.current <= 0) {
+            this.state.isGameOver = true;
+            this.state.isLevelComplete = false;
+            this.state.gameOverReason = 'player_dead';
+        }
+        if (!this.state.isGameOver && this.state.getTotalEliminations() >= this.state.levelGoalTargets) {
             this.state.isLevelComplete = true;
             this.state.isGameOver = true;
+            this.state.gameOverReason = 'level_complete';
         }
         this.state.checkGameOver();
         if (!this.state.isGameOver) {
@@ -436,6 +496,17 @@ class Game {
                         radius: collision.radius
                     };
                 })
+                .concat(this.state.enemies
+                    .map((enemy) => {
+                        const transform = enemy.getComponent('transform');
+                        const collision = enemy.getComponent('collision');
+                        if (!transform || !collision || collision.type !== 'circle') return null;
+                        return {
+                            x: transform.x,
+                            y: transform.y,
+                            radius: collision.radius
+                        };
+                    }))
                 .filter(Boolean)
         });
 
@@ -476,11 +547,18 @@ class Game {
 
         const goalValue = document.getElementById('goalValue');
         if (goalValue) {
+            const eliminations = this.state.getTotalEliminations();
             if (Number.isFinite(this.state.levelGoalTargets)) {
-                goalValue.textContent = `${this.state.targetsDestroyed}/${this.state.levelGoalTargets}`;
+                goalValue.textContent = `${eliminations}/${this.state.levelGoalTargets}`;
             } else {
-                goalValue.textContent = `${this.state.targetsDestroyed}/∞`;
+                goalValue.textContent = `${eliminations}/∞`;
             }
+        }
+
+        const hpValue = document.getElementById('hpValue');
+        if (hpValue) {
+            const hp = this.state.player?.getComponent('health')?.current;
+            hpValue.textContent = Number.isFinite(hp) ? String(Math.max(0, Math.round(hp))) : '-';
         }
     }
 }
@@ -582,6 +660,12 @@ window.__setTargetsDestroyed = function __setTargetsDestroyed(count) {
     if (!window.game || !window.game.state) return;
     const next = Math.max(0, Math.floor(count));
     window.game.state.targetsDestroyed = next;
+};
+
+window.__setEnemiesDestroyed = function __setEnemiesDestroyed(count) {
+    if (!window.game || !window.game.state) return;
+    const next = Math.max(0, Math.floor(count));
+    window.game.state.enemiesDestroyed = next;
 };
 
 window.addEventListener('load', () => {

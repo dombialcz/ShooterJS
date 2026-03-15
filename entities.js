@@ -72,6 +72,40 @@ function createTarget(x, y) {
 }
 
 /**
+ * Create an enemy entity
+ */
+function createEnemy(x, y, enemyData = {}) {
+    const enemyType = enemyData.type === 'ranged' ? 'ranged' : 'melee';
+    const enemy = new Entity(nextEntityId++, 'enemy');
+    const baseSeed = ((CONFIG.ENEMY_RNG_SEED >>> 0) ^ (Math.imul(enemy.id, 2654435761) >>> 0)) >>> 0;
+
+    const maxHealth = Number.isFinite(enemyData.maxHealth)
+        ? enemyData.maxHealth
+        : (enemyType === 'ranged' ? CONFIG.ENEMY_RANGED_MAX_HEALTH : CONFIG.ENEMY_MELEE_MAX_HEALTH);
+    const renderColor = enemyType === 'ranged' ? CONFIG.ENEMY_RANGED_COLOR : CONFIG.ENEMY_MELEE_COLOR;
+
+    enemy.addComponent('transform', Transform(x, y, 0));
+    enemy.addComponent('physics', Physics(0));
+    enemy.addComponent('collision', CollisionCircle(CONFIG.ENEMY_RADIUS));
+    enemy.addComponent('renderable', Renderable('circle', renderColor, CONFIG.ENEMY_RADIUS));
+    enemy.addComponent('health', Health(maxHealth, maxHealth));
+    enemy.addComponent('enemy', Enemy(enemyType, {
+        sourceId: enemyData.id || null,
+        maxHealth: maxHealth,
+        moveSpeed: enemyData.moveSpeed,
+        visionRange: enemyData.visionRange,
+        attackRange: enemyData.attackRange,
+        attackCooldownMs: enemyData.attackCooldownMs,
+        damage: enemyData.damage,
+        scoreValue: enemyType === 'ranged' ? 25 : 20,
+        shotRngState: baseSeed,
+        patrol: enemyData.patrol
+    }));
+
+    return enemy;
+}
+
+/**
  * Create a wall segment entity
  */
 function createWall(x1, y1, x2, y2) {

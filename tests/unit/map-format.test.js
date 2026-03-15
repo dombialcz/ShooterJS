@@ -65,6 +65,50 @@ describe('MapFormat', () => {
     expect(errors.some((entry) => entry.includes('settings.maxTargetsToKill'))).toBe(true);
   });
 
+  it('accepts and normalizes optional enemies payload', () => {
+    const fixture = loadFixtureMap('smoke_default_map');
+    fixture.enemies = [
+      {
+        id: 'enemy-a',
+        type: 'melee',
+        spawn: { col: 4, row: 4 },
+        patrol: [{ col: 5, row: 4 }, { col: 5, row: 5 }]
+      },
+      {
+        type: 'ranged',
+        spawn: { col: 10, row: 8 },
+        maxHealth: 35,
+        moveSpeed: 100,
+        attackRange: 300,
+        attackCooldownMs: 900,
+        damage: 8
+      }
+    ];
+
+    const normalized = MapFormat.normalizeMapData(fixture);
+    expect(Array.isArray(normalized.enemies)).toBe(true);
+    expect(normalized.enemies.length).toBe(2);
+    expect(normalized.enemies[0].id).toBe('enemy-a');
+    expect(normalized.enemies[1].id).toBe('enemy-2');
+    expect(normalized.enemies[0].patrol.length).toBe(2);
+    expect(normalized.enemies[1].type).toBe('ranged');
+  });
+
+  it('rejects invalid enemy payload entries', () => {
+    const fixture = loadFixtureMap('smoke_default_map');
+    fixture.enemies = [
+      {
+        id: 1,
+        type: 'boss',
+        spawn: { col: 1, row: 1 },
+        patrol: [{ col: 2, row: 2 }]
+      }
+    ];
+
+    const errors = MapFormat.validateMapData(fixture);
+    expect(errors.some((entry) => entry.includes('enemies[0].id'))).toBe(true);
+  });
+
   it('accepts committed static-targets level map', () => {
     const mapPath = path.join(process.cwd(), 'maps', 'static-targets.json');
     const payload = JSON.parse(fs.readFileSync(mapPath, 'utf8'));

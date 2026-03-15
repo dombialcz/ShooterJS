@@ -188,4 +188,68 @@ describe('SimulationCore', () => {
     expect(input.isADS).toBe(false);
     expect(input.isShooting).toBe(false);
   });
+
+  it('serializes player hp and enemy deterministic combat state', () => {
+    const mkEntity = (id, comps) => ({ id, getComponent: (n) => comps[n] });
+    const enemyEntity = mkEntity(7, {
+      transform: { x: 100, y: 200 },
+      health: { current: 21, max: 30 },
+      enemy: {
+        sourceId: 'enemy-7',
+        type: 'ranged',
+        state: 'attacking',
+        isAlerted: true,
+        hasLineOfSight: true,
+        lastAttackAtMs: 2222,
+        firstShotMustMiss: false,
+        pendingAttack: false,
+        shotRngState: 0xabcdef01,
+        patrol: [{ x: 120, y: 200 }],
+        currentPath: [{ x: 110, y: 200 }]
+      }
+    });
+    const state = {
+      isPaused: false,
+      isGameOver: true,
+      gameOverReason: 'player_dead',
+      score: 30,
+      timeMs: 4000,
+      shotRngState: 123,
+      roundDurationMs: 120000,
+      roundTimeRemainingMs: 114000,
+      initialTargetCount: 2,
+      initialEnemyCount: 1,
+      targetsDestroyed: 1,
+      enemiesDestroyed: 1,
+      currentMapData: { version: 1, tileSize: 40, cols: 2, rows: 2, meta: { name: 'enemy-state' } },
+      entities: new Map(),
+      walls: [],
+      targets: [{}],
+      enemies: [enemyEntity],
+      doors: [],
+      blocks: [],
+      player: {
+        getComponent(name) {
+          if (name === 'transform') return { x: 10, y: 20, rotation: 1.2 };
+          if (name === 'input') return { moveX: 0, moveY: 0, aimAngle: 1.2, isADS: true, isShooting: false };
+          if (name === 'physics') return { vx: 0, vy: 0 };
+          if (name === 'gun') return { adsStartedAtMs: 0, currentSpreadHalfAngleRad: 0.05 };
+          if (name === 'playerState') return { isADSActive: true, movementSpeedMultiplier: 0.55 };
+          if (name === 'health') return { current: 60, max: 100 };
+          return null;
+        }
+      }
+    };
+
+    global.CONFIG = global.CONFIG || {};
+    global.CONFIG.FIRING_CONE_TIGHTEN_MS = 2000;
+
+    const snapshot = SimulationCore.serializeGameState(state);
+    expect(snapshot.player.health.current).toBe(60);
+    expect(snapshot.enemies.length).toBe(1);
+    expect(snapshot.enemies[0].combat.rngState).toBe(0xabcdef01);
+    expect(snapshot.targets.enemiesDestroyed).toBe(1);
+    expect(snapshot.targets.eliminations).toBe(2);
+    expect(snapshot.round.gameOverReason).toBe('player_dead');
+  });
 });
