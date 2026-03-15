@@ -5,6 +5,7 @@ class GameState {
         this.entities = new Map();
         this.score = 0;
         this.isGameOver = false;
+        this.isLevelComplete = false;
         this.isPaused = false;
         this.player = null;
         this.walls = [];
@@ -21,6 +22,9 @@ class GameState {
         this.targetSpawnCursor = 0;
         this.targetSpawnPoints = [];
         this.pendingTargetRespawns = [];
+        this.levelGoalTargets = 0;
+        this.targetsDestroyed = 0;
+        this.hasDisplayedGameOver = false;
     }
 
     addEntity(entity) {
@@ -62,7 +66,10 @@ class GameState {
 
     addScore(points) {
         this.score += points;
-        document.getElementById('scoreValue').textContent = this.score;
+        const scoreValue = document.getElementById('scoreValue');
+        if (scoreValue) {
+            scoreValue.textContent = this.score;
+        }
     }
 
     scheduleTargetRespawn() {
@@ -89,18 +96,29 @@ class GameState {
     checkGameOver() {
         if (this.roundTimeRemainingMs <= 0 && !this.isGameOver) {
             this.isGameOver = true;
+            this.isLevelComplete = false;
+        }
+
+        if (this.isGameOver && !this.hasDisplayedGameOver) {
             const finalScore = document.getElementById('finalScore');
             if (finalScore) {
                 finalScore.textContent = this.score;
             }
             const title = document.getElementById('gameOverTitle');
             if (title) {
-                title.textContent = "TIME'S UP";
+                title.textContent = this.isLevelComplete ? 'LEVEL COMPLETE' : "TIME'S UP";
+            }
+            const result = document.getElementById('gameOverResult');
+            if (result) {
+                result.textContent = this.isLevelComplete
+                    ? 'You won this level.'
+                    : 'You lost this level.';
             }
             const gameOver = document.getElementById('gameOver');
             if (gameOver) {
                 gameOver.classList.add('visible');
             }
+            this.hasDisplayedGameOver = true;
         }
     }
 
@@ -137,10 +155,11 @@ class GameState {
 }
 
 class Game {
-    constructor() {
+    constructor(initialMapData = null) {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.state = new GameState();
+        this.initialMapData = initialMapData;
 
         this.lastTime = 0;
         this.accumulator = 0;
@@ -160,10 +179,6 @@ class Game {
 
         InputSystem.init(this.canvas, this.state);
 
-        document.getElementById('restartButton').onclick = () => {
-            this.restart();
-        };
-
         console.log('Game initialized!');
         console.log(`Player: ${this.state.player ? 'Created' : 'Missing'}`);
         console.log(`Walls: ${this.state.walls.length}`);
@@ -179,25 +194,10 @@ class Game {
     }
 
     loadMapData() {
-        const fallback = MapFormat.createDefaultMapData();
-        let rawText = null;
-
-        try {
-            rawText = localStorage.getItem(CONFIG.MAP_STORAGE_KEY);
-        } catch (error) {
-            console.warn('Unable to access localStorage map. Falling back to default.', error);
+        if (this.initialMapData) {
+            return MapFormat.normalizeMapData(this.initialMapData);
         }
-
-        if (!rawText) {
-            return fallback;
-        }
-
-        try {
-            return MapFormat.mapFromJson(rawText);
-        } catch (error) {
-            console.warn('Invalid saved map, using default map:', error.message);
-            return fallback;
-        }
+        return MapFormat.createDefaultMapData();
     }
 
     buildMapFromData(mapData) {
@@ -236,6 +236,11 @@ class Game {
 
     createTargets() {
         const mapData = this.state.currentMapData;
+        const configuredTimeLimit = mapData.settings?.timeLimitMs;
+        this.state.roundDurationMs = Number.isInteger(configuredTimeLimit) && configuredTimeLimit > 0
+            ? configuredTimeLimit
+            : CONFIG.ROUND_DURATION_MS;
+        this.state.roundTimeRemainingMs = this.state.roundDurationMs;
         const tile = mapData.tileSize;
         const spawns = Array.isArray(mapData.targetSpawns) ? mapData.targetSpawns : [];
         this.state.targetSpawnPoints = spawns.map((spawn) => ({
@@ -243,6 +248,15 @@ class Game {
             y: spawn.row * tile + tile / 2
         }));
         this.state.initialTargetCount = this.state.targetSpawnPoints.length;
+        this.state.targetsDestroyed = 0;
+        const configuredGoal = mapData.settings?.maxTargetsToKill;
+        if (Number.isInteger(configuredGoal) && configuredGoal > 0) {
+            this.state.levelGoalTargets = configuredGoal;
+        } else if (this.state.initialTargetCount > 0) {
+            this.state.levelGoalTargets = this.state.initialTargetCount;
+        } else {
+            this.state.levelGoalTargets = Number.POSITIVE_INFINITY;
+        }
         this.state.targetSpawnCursor = 0;
         this.state.pendingTargetRespawns = [];
         this.spawnTargets(this.state.initialTargetCount);
@@ -303,6 +317,10 @@ class Game {
         this.state.roundTimeRemainingMs = RoundUtils.getRemainingMs(this.state.timeMs, this.state.roundDurationMs);
 
         this.removeExpiredEntities();
+        if (this.state.targetsDestroyed >= this.state.levelGoalTargets) {
+            this.state.isLevelComplete = true;
+            this.state.isGameOver = true;
+        }
         this.state.checkGameOver();
         if (!this.state.isGameOver) {
             this.processTargetRespawns();
@@ -450,6 +468,84 @@ class Game {
         if (timerValue) {
             timerValue.textContent = RoundUtils.formatCountdown(this.state.roundTimeRemainingMs);
         }
+
+        const mapName = document.getElementById('levelName');
+        if (mapName) {
+            mapName.textContent = this.state.currentMapData?.meta?.name || '-';
+        }
+
+        const goalValue = document.getElementById('goalValue');
+        if (goalValue) {
+            if (Number.isFinite(this.state.levelGoalTargets)) {
+                goalValue.textContent = `${this.state.targetsDestroyed}/${this.state.levelGoalTargets}`;
+            } else {
+                goalValue.textContent = `${this.state.targetsDestroyed}/∞`;
+            }
+        }
+    }
+}
+
+async function loadLevelCatalog() {
+    if (typeof window !== 'undefined' && Array.isArray(window.__testLevelCatalog)) {
+        return window.__testLevelCatalog;
+    }
+    const response = await fetch('./maps/index.json', { cache: 'no-store' });
+    if (!response.ok) {
+        throw new Error(`Unable to load level catalog (${response.status}).`);
+    }
+    const payload = await response.json();
+    if (!Array.isArray(payload?.levels)) {
+        throw new Error('Level catalog must include a levels array.');
+    }
+    return payload.levels;
+}
+
+async function loadLevelMap(levelEntry) {
+    if (typeof window !== 'undefined' && window.__testLevelMaps && levelEntry?.id && window.__testLevelMaps[levelEntry.id]) {
+        return MapFormat.normalizeMapData(window.__testLevelMaps[levelEntry.id]);
+    }
+    const response = await fetch(`./${levelEntry.path}`, { cache: 'no-store' });
+    if (!response.ok) {
+        throw new Error(`Unable to load level "${levelEntry.name}" (${response.status}).`);
+    }
+    const payload = await response.json();
+    return MapFormat.normalizeMapData(payload);
+}
+
+function showLevelMenu(levels, onSelect) {
+    const menu = document.getElementById('levelMenu');
+    const list = document.getElementById('levelList');
+    const status = document.getElementById('levelMenuStatus');
+    if (!menu || !list) return;
+
+    list.innerHTML = '';
+    for (const level of levels) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'level-item';
+        button.textContent = level.name;
+        button.addEventListener('click', () => onSelect(level));
+        list.appendChild(button);
+    }
+
+    if (status) status.textContent = '';
+    menu.classList.add('visible');
+}
+
+function hideLevelMenu() {
+    const menu = document.getElementById('levelMenu');
+    if (menu) menu.classList.remove('visible');
+}
+
+function setLevelMenuStatus(text) {
+    const status = document.getElementById('levelMenuStatus');
+    if (status) status.textContent = text;
+}
+
+function hideGameOverOverlay() {
+    const gameOver = document.getElementById('gameOver');
+    if (gameOver) {
+        gameOver.classList.remove('visible');
     }
 }
 
@@ -482,18 +578,91 @@ window.deserializeGameState = function deserializeGameState(payload) {
     return SimulationCore.deserializeGameState(payload);
 };
 
+window.__setTargetsDestroyed = function __setTargetsDestroyed(count) {
+    if (!window.game || !window.game.state) return;
+    const next = Math.max(0, Math.floor(count));
+    window.game.state.targetsDestroyed = next;
+};
+
 window.addEventListener('load', () => {
-    const game = new Game();
-    window.game = game;
-    game.init();
-    game.start();
+    window.game = null;
+    let levelsCache = [];
+
+    const startLevel = async (level) => {
+        try {
+            setLevelMenuStatus('Loading level...');
+            const mapData = await loadLevelMap(level);
+            hideGameOverOverlay();
+
+            const game = new Game(mapData);
+            window.game = game;
+            game.init();
+            game.start();
+
+            hideLevelMenu();
+        } catch (error) {
+            setLevelMenuStatus(error.message);
+        }
+    };
+
+    const returnToLevelSelect = () => {
+        const current = window.game;
+        if (current) {
+            current.isRunning = false;
+        }
+        window.game = null;
+        hideGameOverOverlay();
+        showLevelMenu(levelsCache, startLevel);
+    };
 
     window.advanceTime = (ms, options = {}) => {
-        if (game.isRunning) {
-            game.isRunning = false;
+        const game = window.game;
+        if (!game) {
+            throw new Error('No active level. Select a level first.');
         }
         game.advanceTime(ms, Object.assign({ skipDOM: true }, options));
     };
 
-    window.render_game_to_text = () => game.renderGameToText();
+    window.render_game_to_text = () => {
+        const game = window.game;
+        if (!game) {
+            return JSON.stringify({
+                mode: 'level_select',
+                hasGame: false
+            });
+        }
+        return game.renderGameToText();
+    };
+
+    const levelSelectButton = document.getElementById('levelSelectButton');
+    if (levelSelectButton) {
+        levelSelectButton.onclick = () => returnToLevelSelect();
+    }
+
+    window.addEventListener('keydown', (event) => {
+        if (event.code === 'Escape' && window.game) {
+            event.preventDefault();
+            returnToLevelSelect();
+        }
+    });
+
+    (async () => {
+        try {
+            const levels = await loadLevelCatalog();
+            levelsCache = levels;
+            showLevelMenu(levelsCache, startLevel);
+        } catch (error) {
+            setLevelMenuStatus(error.message);
+            levelsCache = [
+                {
+                    id: 'fallback-default',
+                    name: 'Fallback Default',
+                    path: ''
+                }
+            ];
+            window.__testLevelMaps = window.__testLevelMaps || {};
+            window.__testLevelMaps['fallback-default'] = MapFormat.createDefaultMapData();
+            showLevelMenu(levelsCache, startLevel);
+        }
+    })();
 });

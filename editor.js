@@ -7,6 +7,8 @@
     const toolGrid = document.getElementById('toolGrid');
     const orientationSelect = document.getElementById('doorOrientation');
     const hingeSelect = document.getElementById('doorHinge');
+    const timeLimitInput = document.getElementById('timeLimitMs');
+    const maxTargetsInput = document.getElementById('maxTargetsToKill');
 
     let activeTool = 'wall';
     let isPainting = false;
@@ -18,6 +20,7 @@
         refreshHingeOptions();
         bindToolButtons();
         bindControls();
+        syncSettingsInputs();
         render();
         setStatus('Map loaded.');
     }
@@ -88,6 +91,7 @@
             try {
                 const imported = MapFormat.mapFromJson(jsonArea.value);
                 mapData = imported;
+                syncSettingsInputs();
                 render();
                 setStatus('JSON imported successfully.');
             } catch (error) {
@@ -98,8 +102,25 @@
         document.getElementById('resetBtn').addEventListener('click', () => {
             mapData = MapFormat.createDefaultMapData();
             jsonArea.value = MapFormat.mapToJson(mapData);
+            syncSettingsInputs();
             render();
             setStatus('Reset to default map.');
+        });
+
+        timeLimitInput.addEventListener('change', () => {
+            const value = Number.parseInt(timeLimitInput.value, 10);
+            mapData.settings = mapData.settings || {};
+            if (Number.isInteger(value) && value > 0) {
+                mapData.settings.timeLimitMs = value;
+            }
+        });
+
+        maxTargetsInput.addEventListener('change', () => {
+            const value = Number.parseInt(maxTargetsInput.value, 10);
+            mapData.settings = mapData.settings || {};
+            if (Number.isInteger(value) && value > 0) {
+                mapData.settings.maxTargetsToKill = value;
+            }
         });
 
         document.getElementById('previewBtn').addEventListener('click', () => {
@@ -147,6 +168,8 @@
             removeDoorAt(cell.col, cell.row);
         } else if (activeTool === 'player') {
             mapData.playerSpawn = { col: cell.col, row: cell.row };
+        } else if (activeTool === 'target') {
+            toggleTargetSpawn(cell.col, cell.row);
         } else if (activeTool === 'door') {
             placeDoor(cell.col, cell.row, orientationSelect.value, hingeSelect.value);
         }
@@ -194,6 +217,18 @@
         });
     }
 
+    function toggleTargetSpawn(col, row) {
+        if (!Array.isArray(mapData.targetSpawns)) {
+            mapData.targetSpawns = [];
+        }
+        const index = mapData.targetSpawns.findIndex((spawn) => spawn.col === col && spawn.row === row);
+        if (index >= 0) {
+            mapData.targetSpawns.splice(index, 1);
+            return;
+        }
+        mapData.targetSpawns.push({ col, row });
+    }
+
     function inBounds(col, row) {
         return col >= 0 && row >= 0 && col < mapData.cols && row < mapData.rows;
     }
@@ -218,6 +253,7 @@
         const text = MapFormat.mapToJson(normalized);
         localStorage.setItem(CONFIG.MAP_STORAGE_KEY, text);
         jsonArea.value = text;
+        syncSettingsInputs();
     }
 
     function render() {
@@ -226,6 +262,7 @@
         drawTiles();
         drawDoors();
         drawPlayerSpawn();
+        drawTargetSpawns();
     }
 
     function drawBackground() {
@@ -327,6 +364,37 @@
         ctx.moveTo(x, y - 10);
         ctx.lineTo(x, y + 10);
         ctx.stroke();
+    }
+
+    function drawTargetSpawns() {
+        const spawns = Array.isArray(mapData.targetSpawns) ? mapData.targetSpawns : [];
+        for (const spawn of spawns) {
+            const x = spawn.col * mapData.tileSize + mapData.tileSize / 2;
+            const y = spawn.row * mapData.tileSize + mapData.tileSize / 2;
+
+            ctx.strokeStyle = '#ff6666';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x, y, mapData.tileSize * 0.22, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x - 7, y);
+            ctx.lineTo(x + 7, y);
+            ctx.moveTo(x, y - 7);
+            ctx.lineTo(x, y + 7);
+            ctx.stroke();
+        }
+    }
+
+    function syncSettingsInputs() {
+        const timeLimitMs = mapData?.settings?.timeLimitMs ?? CONFIG.ROUND_DURATION_MS;
+        const maxTargets = mapData?.settings?.maxTargetsToKill ?? (Array.isArray(mapData.targetSpawns) ? mapData.targetSpawns.length : CONFIG.DEFAULT_LEVEL_GOAL_KILLS);
+        timeLimitInput.value = Number.isFinite(timeLimitMs) ? String(timeLimitMs) : String(CONFIG.ROUND_DURATION_MS);
+        maxTargetsInput.value = Number.isFinite(maxTargets) && maxTargets > 0 ? String(maxTargets) : String(CONFIG.DEFAULT_LEVEL_GOAL_KILLS);
+        mapData.settings = mapData.settings || {};
+        mapData.settings.timeLimitMs = Number.parseInt(timeLimitInput.value, 10);
+        mapData.settings.maxTargetsToKill = Number.parseInt(maxTargetsInput.value, 10);
     }
 
     function setStatus(text, isError = false) {

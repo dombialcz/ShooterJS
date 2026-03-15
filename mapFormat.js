@@ -112,6 +112,10 @@ const MapFormat = {
         return {
             version: this.VERSION,
             meta: { name: 'default' },
+            settings: {
+                timeLimitMs: cfg.ROUND_DURATION_MS || 120000,
+                maxTargetsToKill: 5
+            },
             tileSize: tileSize,
             cols: cols,
             rows: rows,
@@ -208,6 +212,23 @@ const MapFormat = {
             errors.push('meta.name must be a string when provided.');
         }
 
+        if (raw.settings !== undefined) {
+            if (typeof raw.settings !== 'object' || raw.settings === null) {
+                errors.push('settings must be an object when provided.');
+            } else {
+                if (raw.settings.timeLimitMs !== undefined) {
+                    if (!Number.isInteger(raw.settings.timeLimitMs) || raw.settings.timeLimitMs <= 0) {
+                        errors.push('settings.timeLimitMs must be a positive integer when provided.');
+                    }
+                }
+                if (raw.settings.maxTargetsToKill !== undefined) {
+                    if (!Number.isInteger(raw.settings.maxTargetsToKill) || raw.settings.maxTargetsToKill <= 0) {
+                        errors.push('settings.maxTargetsToKill must be a positive integer when provided.');
+                    }
+                }
+            }
+        }
+
         if (raw.targetSpawns !== undefined) {
             if (!Array.isArray(raw.targetSpawns)) {
                 errors.push('targetSpawns must be an array when provided.');
@@ -230,6 +251,14 @@ const MapFormat = {
         const candidate = {
             version: this.VERSION,
             meta: typeof raw?.meta === 'object' && raw.meta !== null ? { ...raw.meta } : { ...base.meta },
+            settings: {
+                timeLimitMs: Number.isInteger(raw?.settings?.timeLimitMs) && raw.settings.timeLimitMs > 0
+                    ? raw.settings.timeLimitMs
+                    : (Number.isInteger(base?.settings?.timeLimitMs) ? base.settings.timeLimitMs : 120000),
+                maxTargetsToKill: Number.isInteger(raw?.settings?.maxTargetsToKill) && raw.settings.maxTargetsToKill > 0
+                    ? raw.settings.maxTargetsToKill
+                    : (Number.isInteger(base?.settings?.maxTargetsToKill) ? base.settings.maxTargetsToKill : 1)
+            },
             tileSize: Number.isInteger(raw?.tileSize) && raw.tileSize > 0 ? raw.tileSize : base.tileSize,
             cols: Number.isInteger(raw?.cols) && raw.cols > 0 ? raw.cols : base.cols,
             rows: Number.isInteger(raw?.rows) && raw.rows > 0 ? raw.rows : base.rows,

@@ -6,6 +6,7 @@ Defined and validated in `mapFormat.js`.
 Fields:
 - `version`
 - `meta` (optional; supports `meta.name`)
+- `settings` (optional; supports `timeLimitMs` and `maxTargetsToKill`)
 - `tileSize`
 - `cols`, `rows`
 - `tiles` (flat array of length `cols * rows`)
@@ -25,8 +26,10 @@ Tile values:
 - Runtime converts descriptor to hinge position + hinge angle via `MapBuildUtils.getDoorEntityDefinition`.
 
 ## Runtime Map Loading
+- Primary source: committed level catalog (`maps/index.json`) and map files under `maps/`.
 - Active map key: `CONFIG.MAP_STORAGE_KEY` (`shooterjs.activeMap.v1`).
-- `game.js` loads from localStorage; invalid payload falls back to default map.
+- LocalStorage map APIs remain for editor import/export and manual preview hooks.
+- `MapFormat.createDefaultMapData()` is kept as an emergency code fallback when the level catalog cannot be loaded.
 - `MapBuildUtils` converts walls to merged segments.
 
 Runtime APIs:
@@ -46,6 +49,7 @@ Tools:
 - block
 - erase
 - player spawn
+- target spawn
 
 Door placement controls:
 - Orientation selector

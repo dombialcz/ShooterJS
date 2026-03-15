@@ -1,0 +1,19 @@
+{
+  "levels": [
+    {
+      "id": "static-targets",
+      "name": "Static targets",
+      "path": "maps/static-targets.json"
+    },
+    {
+      "id": "level-1-tutorial",
+      "name": "Level 1: Tutorial",
+      "path": "maps/level-1-tutorial.json"
+    },
+    {
+      "id": "level-2-training",
+      "name": "Level 2: Training Grounds",
+      "path": "maps/level-2-training.json"
+    }
+  ]
+}

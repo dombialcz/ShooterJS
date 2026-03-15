@@ -72,6 +72,24 @@
             background: rgba(0, 0, 0, 0.4);
             pointer-events: all;
         }
+
+        #levelInfo {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 14px;
+            color: #d8d8d8;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        #goal {
+            position: absolute;
+            top: 58px;
+            left: 20px;
+            font-size: 18px;
+            color: #90caf9;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
         
         #adsIndicator {
             position: absolute;
@@ -117,8 +135,15 @@
             font-size: 24px;
             margin-bottom: 30px;
         }
+
+        #gameOverResult {
+            font-size: 18px;
+            margin-top: -12px;
+            margin-bottom: 22px;
+            color: #ffd28f;
+        }
         
-        #restartButton {
+        #levelSelectButton {
             font-size: 20px;
             padding: 12px 24px;
             background: #ff6464;
@@ -130,8 +155,73 @@
             font-family: 'Courier New', monospace;
         }
         
-        #restartButton:hover {
+        #levelSelectButton:hover {
             background: #ff8484;
+        }
+
+        #levelMenu {
+            position: absolute;
+            inset: 0;
+            display: none;
+            background: rgba(9, 11, 16, 0.92);
+            color: #f7f7f7;
+            pointer-events: all;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+        }
+
+        #levelMenu.visible {
+            display: flex;
+        }
+
+        .level-menu-card {
+            width: min(720px, 90vw);
+            max-height: 80vh;
+            border: 1px solid #3b4554;
+            background: #111721;
+            border-radius: 8px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 14px;
+        }
+
+        .level-menu-card h2 {
+            font-size: 28px;
+            margin: 0;
+        }
+
+        .level-list {
+            overflow-y: auto;
+            display: grid;
+            gap: 8px;
+            max-height: 50vh;
+            padding-right: 4px;
+        }
+
+        .level-item {
+            text-align: left;
+            padding: 10px 12px;
+            border: 1px solid #3f4d61;
+            background: #1a2432;
+            color: #f7f7f7;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .level-item:hover {
+            background: #243449;
+        }
+
+        #levelMenuStatus {
+            color: #ffb4a9;
+            min-height: 20px;
+            margin: 0;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -141,12 +231,22 @@
         <div id="ui">
             <div id="score">SCORE: <span id="scoreValue">0</span></div>
             <div id="roundTimer">TIME: <span id="timerValue">2:00</span></div>
+            <div id="levelInfo">LEVEL: <span id="levelName">-</span></div>
+            <div id="goal">GOAL: <span id="goalValue">0/0</span></div>
             <a id="editorLink" href="./editor.html">Open Map Editor</a>
             <div id="adsIndicator">ADS ACTIVE</div>
             <div id="gameOver">
                 <h1 id="gameOverTitle">TIME'S UP</h1>
                 <p>Final Score: <span id="finalScore">0</span></p>
-                <button id="restartButton">RESTART</button>
+                <p id="gameOverResult">You lost this level.</p>
+                <button id="levelSelectButton">LEVEL SELECT</button>
+            </div>
+            <div id="levelMenu" class="visible">
+                <div class="level-menu-card">
+                    <h2>Select Level</h2>
+                    <div id="levelList" class="level-list"></div>
+                    <p id="levelMenuStatus"></p>
+                </div>
             </div>
         </div>
     </div>

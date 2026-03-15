@@ -50,3 +50,16 @@ Original prompt: Implement plan to add grid map editor + pushable blocks, includ
 - Added unit coverage for block depenetration and e2e regression coverage for sustained-push anti-trap behavior.
 - Relaxed smoke countdown assertion to a bounded deterministic window to avoid single-ms rounding flake.
 - Validation: `npm run test` passed (unit + e2e).
+- Added repository-driven level loading with `maps/index.json` and committed level JSON files; game now starts on a scrollable level-selection menu and only initializes simulation after selecting a level.
+- Extended `MapDataV1` with optional `settings` (`timeLimitMs`, `maxTargetsToKill`) while preserving backward compatibility for existing maps.
+- Editor now supports target spawn markers as first-class map data (toggle add/remove on grid) and level settings inputs with full JSON round-trip.
+- Runtime now enforces level goals: kill target reaches level-complete win, timer expiry causes fail; deterministic serialization exposes goal/destroyed/level-complete state.
+- Updated unit + e2e suites for boot flow, schema changes, and win/lose goal logic; full validation passed.
+- Game-over UX now shows explicit win/lose result + final score and provides a `LEVEL SELECT` button that returns to the level menu.
+- Added global `Escape` shortcut to immediately exit active gameplay and return to level select.
+- Validation: `npm run test` passed after level-select return flow updates.
+- Added committed `maps/static-targets.json` level matching the legacy default map layout and added it as the first level in `maps/index.json`.
+- Kept `MapFormat.createDefaultMapData()` as emergency code fallback; renamed fallback menu label to `Fallback Default` for clarity.
+- Updated map docs to reflect repo-catalog-first loading + code fallback behavior.
+- Added unit validation for committed `static-targets` map and e2e assertion that level menu first entry is `Static targets`.
+- Validation: `npm run test` passed.

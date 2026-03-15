@@ -156,6 +156,7 @@ const ShootingSystem = {
             const targetTransform = hitEntity.getComponent('transform');
             
             gameState.addScore(targetComp.points);
+            gameState.targetsDestroyed = (gameState.targetsDestroyed || 0) + 1;
             const marker = createHitMarker(targetTransform.x, targetTransform.y);
             const markerLifetime = marker.getComponent('lifetime');
             if (markerLifetime) {

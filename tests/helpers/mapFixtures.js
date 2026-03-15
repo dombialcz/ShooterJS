@@ -18,16 +18,32 @@ function loadFixtureMetadata() {
 async function setActiveMap(page, name, storageKey = 'shooterjs.activeMap.v1') {
   const map = loadFixtureMap(name);
   await page.addInitScript(
-    ({ key, payload }) => {
+    ({ key, payload, mapName }) => {
       localStorage.setItem(key, JSON.stringify(payload));
+      window.__testLevelCatalog = [
+        {
+          id: mapName,
+          name: mapName,
+          path: `tests/fixtures/maps/${mapName}.json`
+        }
+      ];
+      window.__testLevelMaps = {
+        [mapName]: payload
+      };
     },
-    { key: storageKey, payload: map }
+    { key: storageKey, payload: map, mapName: name }
   );
   return map;
+}
+
+async function selectFirstLevel(page) {
+  await page.waitForSelector('#levelMenu.visible');
+  await page.click('#levelList .level-item');
 }
 
 module.exports = {
   loadFixtureMap,
   loadFixtureMetadata,
-  setActiveMap
+  setActiveMap,
+  selectFirstLevel
 };

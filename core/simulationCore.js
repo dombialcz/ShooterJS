@@ -161,12 +161,15 @@ const SimulationCore = {
             targets: {
                 alive: gameState.targets.length,
                 targetCount: gameState.initialTargetCount || 0,
-                pendingRespawns: Array.isArray(gameState.pendingTargetRespawns) ? gameState.pendingTargetRespawns.length : 0
+                pendingRespawns: Array.isArray(gameState.pendingTargetRespawns) ? gameState.pendingTargetRespawns.length : 0,
+                destroyed: gameState.targetsDestroyed || 0,
+                goal: Number.isFinite(gameState.levelGoalTargets) ? gameState.levelGoalTargets : null
             },
             round: {
                 timeRemainingMs: Math.max(0, Math.round(gameState.roundTimeRemainingMs || 0)),
                 durationMs: Math.max(0, Math.round(gameState.roundDurationMs || 0)),
-                isExpired: Boolean((gameState.roundTimeRemainingMs || 0) <= 0 || gameState.isGameOver)
+                isExpired: Boolean((gameState.roundTimeRemainingMs || 0) <= 0 || gameState.isGameOver),
+                isLevelComplete: Boolean(gameState.isLevelComplete)
             },
             score: gameState.score,
             isGameOver: gameState.isGameOver,

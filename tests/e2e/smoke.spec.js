@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { setActiveMap } = require('../helpers/mapFixtures');
+const { setActiveMap, selectFirstLevel } = require('../helpers/mapFixtures');
 
 async function waitForCanvasPaint(page) {
   await page.waitForFunction(() => {
@@ -15,6 +15,7 @@ async function waitForCanvasPaint(page) {
 test('smoke map boots and exposes deterministic hooks', async ({ page }) => {
   await setActiveMap(page, 'smoke_default_map');
   await page.goto('/index.html');
+  await selectFirstLevel(page);
 
   await page.waitForFunction(() => typeof window.advanceTime === 'function');
   await page.evaluate(() => window.advanceTime(100));
