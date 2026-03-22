@@ -65,12 +65,86 @@ describe('MapFormat', () => {
     expect(errors.some((entry) => entry.includes('settings.maxTargetsToKill'))).toBe(true);
   });
 
+  it('accepts and normalizes optional enemies payload', () => {
+    const fixture = loadFixtureMap('smoke_default_map');
+    fixture.enemies = [
+      {
+        id: 'enemy-a',
+        type: 'melee',
+        spawn: { col: 4, row: 4 },
+        patrol: [{ col: 5, row: 4 }, { col: 5, row: 5 }]
+      },
+      {
+        type: 'ranged',
+        spawn: { col: 10, row: 8 },
+        maxHealth: 35,
+        moveSpeed: 100,
+        attackRange: 300,
+        attackCooldownMs: 900,
+        damage: 8
+      }
+    ];
+
+    const normalized = MapFormat.normalizeMapData(fixture);
+    expect(Array.isArray(normalized.enemies)).toBe(true);
+    expect(normalized.enemies.length).toBe(2);
+    expect(normalized.enemies[0].id).toBe('enemy-a');
+    expect(normalized.enemies[1].id).toBe('enemy-2');
+    expect(normalized.enemies[0].patrol.length).toBe(2);
+    expect(normalized.enemies[1].type).toBe('ranged');
+  });
+
+  it('rejects invalid enemy payload entries', () => {
+    const fixture = loadFixtureMap('smoke_default_map');
+    fixture.enemies = [
+      {
+        id: 1,
+        type: 'boss',
+        spawn: { col: 1, row: 1 },
+        patrol: [{ col: 2, row: 2 }]
+      }
+    ];
+
+    const errors = MapFormat.validateMapData(fixture);
+    expect(errors.some((entry) => entry.includes('enemies[0].id'))).toBe(true);
+  });
+
   it('accepts committed static-targets level map', () => {
     const mapPath = path.join(process.cwd(), 'maps', 'static-targets.json');
     const payload = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
     const normalized = MapFormat.normalizeMapData(payload);
     const errors = MapFormat.validateMapData(normalized);
+    const horizontalBandAt = (row) => normalized.tiles
+      .slice(row * normalized.cols + 10, row * normalized.cols + 22)
+      .filter((tile) => tile === MapFormat.TILE_WALL)
+      .length;
     expect(errors).toEqual([]);
     expect(normalized.meta.name).toBe('static-targets');
+    expect(normalized.tiles.length).toBe(normalized.cols * normalized.rows);
+    expect(horizontalBandAt(6)).toBe(10);
+    expect(horizontalBandAt(11)).toBe(10);
+  });
+
+  it('repairs legacy padded tile rows instead of dropping to empty tiles', () => {
+    const base = MapFormat.normalizeMapData(MapFormat.createDefaultMapData());
+    const paddedTiles = [];
+
+    for (let row = 0; row < base.rows; row += 1) {
+      const rowStart = row * base.cols;
+      const rowTiles = base.tiles.slice(rowStart, rowStart + base.cols);
+      if (row === 0 || row === base.rows - 1) {
+        paddedTiles.push(...rowTiles);
+        continue;
+      }
+      paddedTiles.push(...rowTiles.slice(0, base.cols - 2), MapFormat.TILE_EMPTY, ...rowTiles.slice(base.cols - 2));
+    }
+
+    const normalized = MapFormat.normalizeMapData({
+      ...base,
+      tiles: paddedTiles
+    });
+
+    expect(normalized.tiles.length).toBe(base.cols * base.rows);
+    expect(normalized.tiles).toEqual(base.tiles);
   });
 });

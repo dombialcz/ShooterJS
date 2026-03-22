@@ -59,6 +59,15 @@
             color: #ffe082;
         }
 
+        #playerHp {
+            position: absolute;
+            top: 92px;
+            right: 20px;
+            font-size: 18px;
+            color: #ffb3b3;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
         #editorLink {
             position: absolute;
             top: 20px;
@@ -231,6 +240,7 @@
         <div id="ui">
             <div id="score">SCORE: <span id="scoreValue">0</span></div>
             <div id="roundTimer">TIME: <span id="timerValue">2:00</span></div>
+            <div id="playerHp">HP: <span id="hpValue">100</span></div>
             <div id="levelInfo">LEVEL: <span id="levelName">-</span></div>
             <div id="goal">GOAL: <span id="goalValue">0/0</span></div>
             <a id="editorLink" href="./editor.html">Open Map Editor</a>
@@ -268,16 +278,21 @@
     <script src="systems/inputSystem.js"></script>
     <script src="systems/movementSystem.js"></script>
     <script src="systems/aimingSystem.js"></script>
+    <script src="systems/enemyPerceptionSystem.js"></script>
+    <script src="systems/enemyBehaviorSystem.js"></script>
     <script src="systems/visionSystem.js"></script>
     <script src="systems/doorSystem.js"></script>
     <script src="systems/blockSystem.js"></script>
     <script src="systems/shootingSystem.js"></script>
+    <script src="systems/enemyCombatSystem.js"></script>
     <script src="systems/renderSystem.js"></script>
 
     <!-- Deterministic Simulation Core -->
     <script src="core/mapBuildUtils.js"></script>
     <script src="core/roundUtils.js"></script>
+    <script src="core/visibilityUtils.js"></script>
     <script src="core/targetSpawnUtils.js"></script>
+    <script src="core/aStarPathfinding.js"></script>
     <script src="core/simulationCore.js"></script>
     
     <!-- Game Loop -->

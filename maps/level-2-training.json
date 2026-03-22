@@ -42,5 +42,32 @@
     { "col": 24, "row": 10 },
     { "col": 19, "row": 13 },
     { "col": 12, "row": 13 }
+  ],
+  "enemies": [
+    {
+      "id": "enemy-1",
+      "type": "melee",
+      "spawn": { "col": 6, "row": 9 },
+      "maxHealth": 50,
+      "patrol": [
+        { "col": 6, "row": 5 },
+        { "col": 9, "row": 9 },
+        { "col": 6, "row": 13 },
+        { "col": 3, "row": 9 }
+      ]
+    },
+    {
+      "id": "enemy-2",
+      "type": "ranged",
+      "spawn": { "col": 27, "row": 9 },
+      "visionRange": 560,
+      "attackRange": 450,
+      "patrol": [
+        { "col": 27, "row": 6 },
+        { "col": 28, "row": 9 },
+        { "col": 27, "row": 12 },
+        { "col": 25, "row": 9 }
+      ]
+    }
   ]
 }

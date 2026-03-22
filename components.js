@@ -190,3 +190,63 @@ function Pushable(canBePushedByPlayer = true, canBePushedByEnemies = true) {
         canBePushedByEnemies: canBePushedByEnemies
     };
 }
+
+/**
+ * Enemy component - AI and combat runtime state
+ */
+function Enemy(type, options = {}) {
+    const enemyType = type === 'ranged' ? 'ranged' : 'melee';
+    const defaults = enemyType === 'ranged'
+        ? {
+            moveSpeed: CONFIG.ENEMY_RANGED_MOVE_SPEED,
+            visionRange: CONFIG.ENEMY_RANGED_VISION_RANGE,
+            attackRange: CONFIG.ENEMY_RANGED_ATTACK_RANGE,
+            attackCooldownMs: CONFIG.ENEMY_RANGED_ATTACK_COOLDOWN_MS,
+            damage: CONFIG.ENEMY_RANGED_DAMAGE,
+            maxHealth: CONFIG.ENEMY_RANGED_MAX_HEALTH
+        }
+        : {
+            moveSpeed: CONFIG.ENEMY_MELEE_MOVE_SPEED,
+            visionRange: CONFIG.ENEMY_MELEE_VISION_RANGE,
+            attackRange: CONFIG.ENEMY_MELEE_ATTACK_RANGE,
+            attackCooldownMs: CONFIG.ENEMY_MELEE_ATTACK_COOLDOWN_MS,
+            damage: CONFIG.ENEMY_MELEE_DAMAGE,
+            maxHealth: CONFIG.ENEMY_MELEE_MAX_HEALTH
+        };
+
+    const patrol = Array.isArray(options.patrol)
+        ? options.patrol
+            .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
+            .map((point) => ({ x: point.x, y: point.y }))
+        : [];
+
+    return {
+        type: enemyType,
+        state: 'idle',
+        isAlerted: false,
+        hasLineOfSight: false,
+        lastSeenPlayerAtMs: null,
+        moveSpeed: Number.isFinite(options.moveSpeed) ? options.moveSpeed : defaults.moveSpeed,
+        visionRange: Number.isFinite(options.visionRange) ? options.visionRange : defaults.visionRange,
+        attackRange: Number.isFinite(options.attackRange) ? options.attackRange : defaults.attackRange,
+        attackCooldownMs: Number.isFinite(options.attackCooldownMs) ? options.attackCooldownMs : defaults.attackCooldownMs,
+        damage: Number.isFinite(options.damage) ? options.damage : defaults.damage,
+        scoreValue: Number.isFinite(options.scoreValue) ? options.scoreValue : 25,
+        pendingAttack: false,
+        lastAttackAtMs: Number.NEGATIVE_INFINITY,
+        firstShotMustMiss: enemyType === 'ranged',
+        shotRngState: (options.shotRngState >>> 0) || 0,
+        patrol: patrol,
+        patrolIndex: 0,
+        currentPath: [],
+        pathIndex: 0,
+        nextRepathAtMs: 0,
+        lastRepathAtMs: 0,
+        lastPositionX: null,
+        lastPositionY: null,
+        stuckSinceMs: null,
+        preferredDistance: Number.isFinite(options.preferredDistance) ? options.preferredDistance : defaults.attackRange * 0.75,
+        maxHealth: Number.isFinite(options.maxHealth) ? options.maxHealth : defaults.maxHealth,
+        sourceId: typeof options.sourceId === 'string' ? options.sourceId : null
+    };
+}

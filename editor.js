@@ -9,10 +9,12 @@
     const hingeSelect = document.getElementById('doorHinge');
     const timeLimitInput = document.getElementById('timeLimitMs');
     const maxTargetsInput = document.getElementById('maxTargetsToKill');
+    const enemySelectionHint = document.getElementById('enemySelectionHint');
 
     let activeTool = 'wall';
     let isPainting = false;
     let mapData = loadInitialMap();
+    let selectedEnemyId = null;
 
     setup();
 
@@ -21,6 +23,7 @@
         bindToolButtons();
         bindControls();
         syncSettingsInputs();
+        syncEnemySelectionHint();
         render();
         setStatus('Map loaded.');
     }
@@ -91,7 +94,9 @@
             try {
                 const imported = MapFormat.mapFromJson(jsonArea.value);
                 mapData = imported;
+                selectedEnemyId = null;
                 syncSettingsInputs();
+                syncEnemySelectionHint();
                 render();
                 setStatus('JSON imported successfully.');
             } catch (error) {
@@ -101,8 +106,10 @@
 
         document.getElementById('resetBtn').addEventListener('click', () => {
             mapData = MapFormat.createDefaultMapData();
+            selectedEnemyId = null;
             jsonArea.value = MapFormat.mapToJson(mapData);
             syncSettingsInputs();
+            syncEnemySelectionHint();
             render();
             setStatus('Reset to default map.');
         });
@@ -125,7 +132,7 @@
 
         document.getElementById('previewBtn').addEventListener('click', () => {
             persistMap();
-            window.open('./index.html', '_blank');
+            window.open('./index.html?editorPreview=1', '_blank');
         });
     }
 
@@ -160,20 +167,30 @@
         if (activeTool === 'wall') {
             placeTile(cell.col, cell.row, MapFormat.TILE_WALL);
             removeDoorAt(cell.col, cell.row);
+            removeEnemyAt(cell.col, cell.row);
         } else if (activeTool === 'block') {
             placeTile(cell.col, cell.row, MapFormat.TILE_BLOCK);
             removeDoorAt(cell.col, cell.row);
+            removeEnemyAt(cell.col, cell.row);
         } else if (activeTool === 'erase') {
             placeTile(cell.col, cell.row, MapFormat.TILE_EMPTY);
             removeDoorAt(cell.col, cell.row);
+            removeEnemyAt(cell.col, cell.row);
         } else if (activeTool === 'player') {
             mapData.playerSpawn = { col: cell.col, row: cell.row };
         } else if (activeTool === 'target') {
             toggleTargetSpawn(cell.col, cell.row);
+        } else if (activeTool === 'enemyMelee') {
+            toggleEnemySpawn(cell.col, cell.row, 'melee');
+        } else if (activeTool === 'enemyRanged') {
+            toggleEnemySpawn(cell.col, cell.row, 'ranged');
+        } else if (activeTool === 'patrol') {
+            togglePatrolWaypoint(cell.col, cell.row);
         } else if (activeTool === 'door') {
             placeDoor(cell.col, cell.row, orientationSelect.value, hingeSelect.value);
         }
 
+        syncEnemySelectionHint();
         render();
     }
 
@@ -229,6 +246,91 @@
         mapData.targetSpawns.push({ col, row });
     }
 
+    function ensureEnemyArray() {
+        if (!Array.isArray(mapData.enemies)) {
+            mapData.enemies = [];
+        }
+    }
+
+    function toggleEnemySpawn(col, row, type) {
+        ensureEnemyArray();
+        const existingIndex = mapData.enemies.findIndex((enemy) => enemy.spawn?.col === col && enemy.spawn?.row === row);
+        if (existingIndex >= 0) {
+            const existing = mapData.enemies[existingIndex];
+            if (existing.id === selectedEnemyId) {
+                selectedEnemyId = null;
+            }
+            if (existing.type === type) {
+                mapData.enemies.splice(existingIndex, 1);
+                return;
+            }
+            mapData.enemies.splice(existingIndex, 1);
+        }
+
+        const enemy = {
+            id: createEnemyId(),
+            type,
+            spawn: { col, row },
+            patrol: []
+        };
+        mapData.enemies.push(enemy);
+        selectedEnemyId = enemy.id;
+    }
+
+    function createEnemyId() {
+        ensureEnemyArray();
+        let maxId = 0;
+        for (const enemy of mapData.enemies) {
+            const match = /^enemy-(\d+)$/.exec(enemy.id || '');
+            if (!match) continue;
+            const value = Number.parseInt(match[1], 10);
+            if (value > maxId) maxId = value;
+        }
+        return `enemy-${maxId + 1}`;
+    }
+
+    function findEnemyById(enemyId) {
+        ensureEnemyArray();
+        return mapData.enemies.find((enemy) => enemy.id === enemyId) || null;
+    }
+
+    function findEnemyAtCell(col, row) {
+        ensureEnemyArray();
+        return mapData.enemies.find((enemy) => enemy.spawn?.col === col && enemy.spawn?.row === row) || null;
+    }
+
+    function removeEnemyAt(col, row) {
+        ensureEnemyArray();
+        const before = mapData.enemies.length;
+        mapData.enemies = mapData.enemies.filter((enemy) => !(enemy.spawn?.col === col && enemy.spawn?.row === row));
+        if (mapData.enemies.length !== before && !findEnemyById(selectedEnemyId)) {
+            selectedEnemyId = null;
+        }
+    }
+
+    function togglePatrolWaypoint(col, row) {
+        ensureEnemyArray();
+        const enemyAtCell = findEnemyAtCell(col, row);
+        if (enemyAtCell) {
+            selectedEnemyId = enemyAtCell.id;
+            return;
+        }
+
+        const selectedEnemy = findEnemyById(selectedEnemyId);
+        if (!selectedEnemy) {
+            setStatus('Select an enemy first, then place patrol waypoints.', true);
+            return;
+        }
+
+        selectedEnemy.patrol = Array.isArray(selectedEnemy.patrol) ? selectedEnemy.patrol : [];
+        const index = selectedEnemy.patrol.findIndex((point) => point.col === col && point.row === row);
+        if (index >= 0) {
+            selectedEnemy.patrol.splice(index, 1);
+            return;
+        }
+        selectedEnemy.patrol.push({ col, row });
+    }
+
     function inBounds(col, row) {
         return col >= 0 && row >= 0 && col < mapData.cols && row < mapData.rows;
     }
@@ -248,12 +350,15 @@
     }
 
     function persistMap() {
+        const previousSelection = selectedEnemyId;
         const normalized = MapFormat.normalizeMapData(mapData);
         mapData = normalized;
+        selectedEnemyId = findEnemyById(previousSelection) ? previousSelection : null;
         const text = MapFormat.mapToJson(normalized);
         localStorage.setItem(CONFIG.MAP_STORAGE_KEY, text);
         jsonArea.value = text;
         syncSettingsInputs();
+        syncEnemySelectionHint();
     }
 
     function render() {
@@ -263,6 +368,8 @@
         drawDoors();
         drawPlayerSpawn();
         drawTargetSpawns();
+        drawEnemyPatrols();
+        drawEnemySpawns();
     }
 
     function drawBackground() {
@@ -387,14 +494,98 @@
         }
     }
 
+    function drawEnemyPatrols() {
+        ensureEnemyArray();
+        const tile = mapData.tileSize;
+
+        for (const enemy of mapData.enemies) {
+            const patrol = Array.isArray(enemy.patrol) ? enemy.patrol : [];
+            if (patrol.length === 0) continue;
+
+            ctx.strokeStyle = enemy.id === selectedEnemyId ? 'rgba(255, 224, 120, 0.95)' : 'rgba(255, 224, 120, 0.5)';
+            ctx.lineWidth = enemy.id === selectedEnemyId ? 3 : 2;
+            ctx.beginPath();
+
+            const startX = enemy.spawn.col * tile + tile / 2;
+            const startY = enemy.spawn.row * tile + tile / 2;
+            ctx.moveTo(startX, startY);
+
+            for (const point of patrol) {
+                const px = point.col * tile + tile / 2;
+                const py = point.row * tile + tile / 2;
+                ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            for (let i = 0; i < patrol.length; i++) {
+                const point = patrol[i];
+                const px = point.col * tile + tile / 2;
+                const py = point.row * tile + tile / 2;
+                ctx.fillStyle = enemy.id === selectedEnemyId ? '#ffe078' : '#d9c06a';
+                ctx.beginPath();
+                ctx.arc(px, py, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#111316';
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(i + 1), px, py - 9);
+            }
+        }
+    }
+
+    function drawEnemySpawns() {
+        ensureEnemyArray();
+        const tile = mapData.tileSize;
+        for (const enemy of mapData.enemies) {
+            const x = enemy.spawn.col * tile + tile / 2;
+            const y = enemy.spawn.row * tile + tile / 2;
+            const isSelected = enemy.id === selectedEnemyId;
+            const radius = tile * 0.2;
+
+            ctx.fillStyle = enemy.type === 'ranged' ? '#ff8f5e' : '#8ddf65';
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = isSelected ? '#ffe078' : '#ffffff';
+            ctx.lineWidth = isSelected ? 3 : 2;
+            if (enemy.type === 'ranged') {
+                ctx.strokeRect(x - radius * 0.9, y - radius * 0.9, radius * 1.8, radius * 1.8);
+            } else {
+                ctx.beginPath();
+                ctx.moveTo(x - radius * 0.6, y - radius * 0.6);
+                ctx.lineTo(x + radius * 0.6, y + radius * 0.6);
+                ctx.moveTo(x + radius * 0.6, y - radius * 0.6);
+                ctx.lineTo(x - radius * 0.6, y + radius * 0.6);
+                ctx.stroke();
+            }
+        }
+    }
+
     function syncSettingsInputs() {
+        ensureEnemyArray();
         const timeLimitMs = mapData?.settings?.timeLimitMs ?? CONFIG.ROUND_DURATION_MS;
-        const maxTargets = mapData?.settings?.maxTargetsToKill ?? (Array.isArray(mapData.targetSpawns) ? mapData.targetSpawns.length : CONFIG.DEFAULT_LEVEL_GOAL_KILLS);
+        const maxTargets = mapData?.settings?.maxTargetsToKill ?? (
+            (Array.isArray(mapData.targetSpawns) ? mapData.targetSpawns.length : 0) + mapData.enemies.length || CONFIG.DEFAULT_LEVEL_GOAL_KILLS
+        );
         timeLimitInput.value = Number.isFinite(timeLimitMs) ? String(timeLimitMs) : String(CONFIG.ROUND_DURATION_MS);
         maxTargetsInput.value = Number.isFinite(maxTargets) && maxTargets > 0 ? String(maxTargets) : String(CONFIG.DEFAULT_LEVEL_GOAL_KILLS);
         mapData.settings = mapData.settings || {};
         mapData.settings.timeLimitMs = Number.parseInt(timeLimitInput.value, 10);
         mapData.settings.maxTargetsToKill = Number.parseInt(maxTargetsInput.value, 10);
+    }
+
+    function syncEnemySelectionHint() {
+        if (!enemySelectionHint) return;
+        const enemy = findEnemyById(selectedEnemyId);
+        if (!enemy) {
+            enemySelectionHint.textContent = 'Patrol tool: click an enemy to select, then click tiles to add/remove patrol waypoints.';
+            return;
+        }
+        const patrolCount = Array.isArray(enemy.patrol) ? enemy.patrol.length : 0;
+        enemySelectionHint.textContent = `Selected ${enemy.type} (${enemy.id}) at [${enemy.spawn.col},${enemy.spawn.row}] with ${patrolCount} patrol points.`;
     }
 
     function setStatus(text, isError = false) {

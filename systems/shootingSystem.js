@@ -99,6 +99,40 @@ const ShootingSystem = {
         }
         
         // Check targets
+        for (const enemyEntity of gameState.enemies || []) {
+            const enemyComp = enemyEntity.getComponent('enemy');
+            const enemyTransform = enemyEntity.getComponent('transform');
+            const enemyCollision = enemyEntity.getComponent('collision');
+            const enemyHealth = enemyEntity.getComponent('health');
+            if (!enemyComp || !enemyTransform || !enemyCollision || !enemyHealth || enemyHealth.current <= 0) continue;
+
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const fx = startX - enemyTransform.x;
+            const fy = startY - enemyTransform.y;
+
+            const a = dx * dx + dy * dy;
+            const b = 2 * (fx * dx + fy * dy);
+            const c = (fx * fx + fy * fy) - enemyCollision.radius * enemyCollision.radius;
+
+            const discriminant = b * b - 4 * a * c;
+            if (discriminant < 0) continue;
+
+            const t = (-b - Math.sqrt(discriminant)) / (2 * a);
+            if (t < 0 || t > 1) continue;
+
+            const hitX = startX + t * dx;
+            const hitY = startY + t * dy;
+            const dist = Geometry.distance(startX, startY, hitX, hitY);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestHit = { x: hitX, y: hitY };
+                hitType = 'enemy';
+                hitEntity = enemyEntity;
+            }
+        }
+
+        // Check targets
         for (const target of gameState.targets) {
             const targetComp = target.getComponent('target');
             if (!targetComp || targetComp.isDestroyed) continue;
@@ -143,7 +177,7 @@ const ShootingSystem = {
         const finalY = closestHit ? closestHit.y : endY;
         
         // Create tracer line for visual feedback
-        const tracer = createTracerLine(startX, startY, finalX, finalY, hitType === 'target' ? '#ff0000' : '#ffff00');
+        const tracer = createTracerLine(startX, startY, finalX, finalY, (hitType === 'target' || hitType === 'enemy') ? '#ff0000' : '#ffff00');
         const tracerLifetime = tracer.getComponent('lifetime');
         if (tracerLifetime) {
             tracerLifetime.createdAt = gameState.timeMs ?? Date.now();
@@ -166,6 +200,28 @@ const ShootingSystem = {
             gameState.removeEntity(hitEntity.id);
             
             console.log(`Target hit! Score: ${gameState.score}`);
+        }
+
+        if (hitType === 'enemy' && hitEntity) {
+            const enemyComp = hitEntity.getComponent('enemy');
+            const enemyTransform = hitEntity.getComponent('transform');
+            const enemyHealth = hitEntity.getComponent('health');
+            if (enemyComp && enemyTransform && enemyHealth) {
+                const shotDamage = 15;
+                enemyHealth.current = Math.max(0, enemyHealth.current - shotDamage);
+                const marker = createHitMarker(enemyTransform.x, enemyTransform.y);
+                const markerLifetime = marker.getComponent('lifetime');
+                if (markerLifetime) {
+                    markerLifetime.createdAt = gameState.timeMs ?? Date.now();
+                }
+                gameState.addEntity(marker);
+
+                if (enemyHealth.current <= 0) {
+                    gameState.addScore(enemyComp.scoreValue || 25);
+                    gameState.enemiesDestroyed = (gameState.enemiesDestroyed || 0) + 1;
+                    gameState.removeEntity(hitEntity.id);
+                }
+            }
         }
     },
 

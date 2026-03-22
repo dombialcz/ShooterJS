@@ -41,5 +41,18 @@
     { "col": 20, "row": 9 },
     { "col": 16, "row": 12 },
     { "col": 10, "row": 14 }
+  ],
+  "enemies": [
+    {
+      "id": "enemy-1",
+      "type": "melee",
+      "spawn": { "col": 24, "row": 9 },
+      "patrol": [
+        { "col": 24, "row": 5 },
+        { "col": 27, "row": 9 },
+        { "col": 24, "row": 13 },
+        { "col": 21, "row": 9 }
+      ]
+    }
   ]
 }

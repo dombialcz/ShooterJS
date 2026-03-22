@@ -128,7 +128,8 @@ const MapFormat = {
                 { col: 26, row: 4 },
                 { col: 15, row: 14 },
                 { col: 26, row: 13 }
-            ]
+            ],
+            enemies: []
         };
     },
 
@@ -243,6 +244,58 @@ const MapFormat = {
             }
         }
 
+        if (raw.enemies !== undefined) {
+            if (!Array.isArray(raw.enemies)) {
+                errors.push('enemies must be an array when provided.');
+            } else {
+                for (let i = 0; i < raw.enemies.length; i++) {
+                    const enemy = raw.enemies[i];
+                    if (!enemy || typeof enemy !== 'object') {
+                        errors.push(`enemies[${i}] must be an object.`);
+                        break;
+                    }
+                    if (enemy.id !== undefined && typeof enemy.id !== 'string') {
+                        errors.push(`enemies[${i}].id must be a string when provided.`);
+                        break;
+                    }
+                    if (enemy.type !== 'melee' && enemy.type !== 'ranged') {
+                        errors.push(`enemies[${i}].type must be "melee" or "ranged".`);
+                        break;
+                    }
+                    if (!enemy.spawn || !Number.isInteger(enemy.spawn.col) || !Number.isInteger(enemy.spawn.row)) {
+                        errors.push(`enemies[${i}].spawn must include integer col/row.`);
+                        break;
+                    }
+
+                    const numericFields = ['maxHealth', 'moveSpeed', 'visionRange', 'attackRange', 'attackCooldownMs', 'damage'];
+                    for (const field of numericFields) {
+                        if (enemy[field] !== undefined) {
+                            if (typeof enemy[field] !== 'number' || !Number.isFinite(enemy[field]) || enemy[field] <= 0) {
+                                errors.push(`enemies[${i}].${field} must be a positive number when provided.`);
+                                break;
+                            }
+                        }
+                    }
+                    if (errors.length > 0) break;
+
+                    if (enemy.patrol !== undefined) {
+                        if (!Array.isArray(enemy.patrol)) {
+                            errors.push(`enemies[${i}].patrol must be an array when provided.`);
+                            break;
+                        }
+                        for (let j = 0; j < enemy.patrol.length; j++) {
+                            const waypoint = enemy.patrol[j];
+                            if (!waypoint || !Number.isInteger(waypoint.col) || !Number.isInteger(waypoint.row)) {
+                                errors.push(`enemies[${i}].patrol[${j}] must include integer col/row.`);
+                                break;
+                            }
+                        }
+                        if (errors.length > 0) break;
+                    }
+                }
+            }
+        }
+
         return errors;
     },
 
@@ -268,11 +321,42 @@ const MapFormat = {
                 col: Number.isInteger(raw?.playerSpawn?.col) ? raw.playerSpawn.col : base.playerSpawn.col,
                 row: Number.isInteger(raw?.playerSpawn?.row) ? raw.playerSpawn.row : base.playerSpawn.row
             },
-            targetSpawns: Array.isArray(raw?.targetSpawns) ? raw.targetSpawns.slice() : base.targetSpawns.slice()
+            targetSpawns: Array.isArray(raw?.targetSpawns) ? raw.targetSpawns.slice() : base.targetSpawns.slice(),
+            enemies: Array.isArray(raw?.enemies)
+                ? raw.enemies
+                    .filter((enemy) => enemy && typeof enemy === 'object')
+                    .map((enemy, index) => {
+                        const normalized = {
+                            id: typeof enemy.id === 'string' && enemy.id.trim().length > 0
+                                ? enemy.id
+                                : `enemy-${index + 1}`,
+                            type: enemy.type === 'ranged' ? 'ranged' : 'melee',
+                            spawn: {
+                                col: Number.isInteger(enemy?.spawn?.col) ? enemy.spawn.col : base.playerSpawn.col,
+                                row: Number.isInteger(enemy?.spawn?.row) ? enemy.spawn.row : base.playerSpawn.row
+                            },
+                            patrol: Array.isArray(enemy?.patrol)
+                                ? enemy.patrol
+                                    .filter((waypoint) => Number.isInteger(waypoint?.col) && Number.isInteger(waypoint?.row))
+                                    .map((waypoint) => ({ col: waypoint.col, row: waypoint.row }))
+                                : []
+                        };
+
+                        const numericFields = ['maxHealth', 'moveSpeed', 'visionRange', 'attackRange', 'attackCooldownMs', 'damage'];
+                        for (const field of numericFields) {
+                            if (typeof enemy[field] === 'number' && Number.isFinite(enemy[field]) && enemy[field] > 0) {
+                                normalized[field] = enemy[field];
+                            }
+                        }
+
+                        return normalized;
+                    })
+                : []
         };
 
         if (candidate.tiles.length !== candidate.cols * candidate.rows) {
-            candidate.tiles = this.createEmptyTiles(candidate.cols, candidate.rows, this.TILE_EMPTY);
+            const repairedTiles = this.tryRepairLegacyPaddedTiles(candidate.tiles, candidate.cols, candidate.rows);
+            candidate.tiles = repairedTiles || this.createEmptyTiles(candidate.cols, candidate.rows, this.TILE_EMPTY);
         }
 
         const errors = this.validateMapData(candidate);
@@ -281,6 +365,52 @@ const MapFormat = {
         }
 
         return candidate;
+    },
+
+    tryRepairLegacyPaddedTiles(tiles, cols, rows) {
+        if (!Array.isArray(tiles) || !Number.isInteger(cols) || !Number.isInteger(rows) || cols <= 2 || rows <= 2) {
+            return null;
+        }
+        const expected = cols * rows;
+        if (tiles.length === expected) {
+            return tiles.slice();
+        }
+
+        // Legacy malformed committed maps had one extra tile in each interior row.
+        if (tiles.length !== expected + (rows - 2)) {
+            return null;
+        }
+
+        const repaired = [];
+        let cursor = 0;
+
+        const firstRow = tiles.slice(cursor, cursor + cols);
+        if (firstRow.length !== cols) return null;
+        repaired.push(...firstRow);
+        cursor += cols;
+
+        const dropIndex = cols - 2;
+        for (let row = 1; row < rows - 1; row++) {
+            const paddedRow = tiles.slice(cursor, cursor + cols + 1);
+            if (paddedRow.length !== cols + 1) return null;
+
+            const repairedRow = paddedRow.slice(0, dropIndex).concat(paddedRow.slice(dropIndex + 1));
+            if (repairedRow.length !== cols) return null;
+
+            repaired.push(...repairedRow);
+            cursor += cols + 1;
+        }
+
+        const lastRow = tiles.slice(cursor, cursor + cols);
+        if (lastRow.length !== cols) return null;
+        repaired.push(...lastRow);
+        cursor += cols;
+
+        if (cursor !== tiles.length || repaired.length !== expected) {
+            return null;
+        }
+
+        return repaired;
     },
 
     mapToJson(mapData) {

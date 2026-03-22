@@ -109,3 +109,7 @@ const DoorSystem = {
         };
     }
 };
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DoorSystem;
+}
