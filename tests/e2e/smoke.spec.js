@@ -34,3 +34,19 @@ test('smoke map boots and exposes deterministic hooks', async ({ page }) => {
 
   await expect(page).toHaveScreenshot('smoke_default.png');
 });
+
+test('editor preview query boots directly into saved map', async ({ page }) => {
+  await setActiveMap(page, 'smoke_default_map');
+  await page.goto('/index.html?editorPreview=1');
+  await page.waitForFunction(() => typeof window.advanceTime === 'function');
+  await page.waitForFunction(() => Boolean(window.game));
+  await page.evaluate(() => window.advanceTime(100));
+  await waitForCanvasPaint(page);
+
+  const snapshot = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
+  expect(snapshot.player).toBeTruthy();
+  expect(snapshot.activeMap.name).toBe('smoke_default_map');
+
+  const isLevelMenuVisible = await page.evaluate(() => document.getElementById('levelMenu').classList.contains('visible'));
+  expect(isLevelMenuVisible).toBe(false);
+});

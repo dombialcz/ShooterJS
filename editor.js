@@ -132,7 +132,7 @@
 
         document.getElementById('previewBtn').addEventListener('click', () => {
             persistMap();
-            window.open('./index.html', '_blank');
+            window.open('./index.html?editorPreview=1', '_blank');
         });
     }
 

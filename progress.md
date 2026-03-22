@@ -63,3 +63,20 @@ Original prompt: Implement plan to add grid map editor + pushable blocks, includ
 - Updated map docs to reflect repo-catalog-first loading + code fallback behavior.
 - Added unit validation for committed `static-targets` map and e2e assertion that level menu first entry is `Static targets`.
 - Validation: `npm run test` passed.
+- Fixed malformed committed level tile arrays (including `maps/static-targets.json`) being normalized to empty tiles, which removed walls/green blocks at runtime.
+- Added deterministic legacy-tile repair in `MapFormat.normalizeMapData()` (`tryRepairLegacyPaddedTiles`) to recover known padded-row data and preserve `MapDataV1` compatibility.
+- Added unit coverage in `tests/unit/map-format.test.js` asserting repaired maps keep non-zero wall/block tiles.
+- Revalidated with full required gate: `npm run test` passed (unit + e2e).
+- Corrected `maps/static-targets.json` tile payload to valid `cols * rows` length (576) and restored intended horizontal wall bands around horizontal doors (rows 6 and 11 with door gaps).
+- Extended static-targets unit assertions to validate horizontal wall bands are present after normalization.
+- Kept a dedicated legacy-padded-tile repair unit test by synthesizing malformed padded rows from `createDefaultMapData()` and verifying exact round-trip recovery.
+- Revalidated with required full gate: `npm run test` passed (unit + e2e).
+- Added committed level `maps/closed-room-enemy.json` with a standalone wall, a sealed interior room, and one melee enemy spawn inside the room.
+- Registered new level in `maps/index.json` (`Closed room enemy`) so it appears in level select.
+- Validated new map payload through `MapFormat.normalizeMapData/validateMapData` and reran full gate.
+- Validation: `npm run test` passed (unit + e2e).
+- Changed editor preview behavior: `Open Game Preview` now opens `index.html?editorPreview=1` so gameplay launches directly using the editor-saved map instead of entering level select first.
+- Added game boot support for editor preview mode (`editorPreview=1`) with direct map start from `CONFIG.MAP_STORAGE_KEY`; normal level-select flow remains unchanged.
+- Hardened return-to-level-select path to lazy-load level catalog when preview mode starts without prior catalog load.
+- Added e2e regression test in `tests/e2e/smoke.spec.js` to verify editor preview boots directly into active map and hides level menu.
+- Validation: `npm run test` passed (unit + e2e, 17 Playwright tests).

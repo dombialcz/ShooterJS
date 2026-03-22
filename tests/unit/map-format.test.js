@@ -114,7 +114,37 @@ describe('MapFormat', () => {
     const payload = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
     const normalized = MapFormat.normalizeMapData(payload);
     const errors = MapFormat.validateMapData(normalized);
+    const horizontalBandAt = (row) => normalized.tiles
+      .slice(row * normalized.cols + 10, row * normalized.cols + 22)
+      .filter((tile) => tile === MapFormat.TILE_WALL)
+      .length;
     expect(errors).toEqual([]);
     expect(normalized.meta.name).toBe('static-targets');
+    expect(normalized.tiles.length).toBe(normalized.cols * normalized.rows);
+    expect(horizontalBandAt(6)).toBe(10);
+    expect(horizontalBandAt(11)).toBe(10);
+  });
+
+  it('repairs legacy padded tile rows instead of dropping to empty tiles', () => {
+    const base = MapFormat.normalizeMapData(MapFormat.createDefaultMapData());
+    const paddedTiles = [];
+
+    for (let row = 0; row < base.rows; row += 1) {
+      const rowStart = row * base.cols;
+      const rowTiles = base.tiles.slice(rowStart, rowStart + base.cols);
+      if (row === 0 || row === base.rows - 1) {
+        paddedTiles.push(...rowTiles);
+        continue;
+      }
+      paddedTiles.push(...rowTiles.slice(0, base.cols - 2), MapFormat.TILE_EMPTY, ...rowTiles.slice(base.cols - 2));
+    }
+
+    const normalized = MapFormat.normalizeMapData({
+      ...base,
+      tiles: paddedTiles
+    });
+
+    expect(normalized.tiles.length).toBe(base.cols * base.rows);
+    expect(normalized.tiles).toEqual(base.tiles);
   });
 });

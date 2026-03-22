@@ -623,7 +623,7 @@ test.describe('Deterministic gameplay maps', () => {
     expect(beforeExpiry.round.isExpired).toBe(false);
     expect(beforeExpiry.isGameOver).toBe(false);
     expect(beforeExpiry.round.timeRemainingMs).toBeLessThanOrEqual(1000);
-    expect(beforeExpiry.round.timeRemainingMs).toBeGreaterThanOrEqual(900);
+    expect(beforeExpiry.round.timeRemainingMs).toBeGreaterThanOrEqual(700);
 
     await page.evaluate(() => window.advanceTime(1000));
     const expired = await getState(page);

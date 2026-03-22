@@ -355,7 +355,8 @@ const MapFormat = {
         };
 
         if (candidate.tiles.length !== candidate.cols * candidate.rows) {
-            candidate.tiles = this.createEmptyTiles(candidate.cols, candidate.rows, this.TILE_EMPTY);
+            const repairedTiles = this.tryRepairLegacyPaddedTiles(candidate.tiles, candidate.cols, candidate.rows);
+            candidate.tiles = repairedTiles || this.createEmptyTiles(candidate.cols, candidate.rows, this.TILE_EMPTY);
         }
 
         const errors = this.validateMapData(candidate);
@@ -364,6 +365,52 @@ const MapFormat = {
         }
 
         return candidate;
+    },
+
+    tryRepairLegacyPaddedTiles(tiles, cols, rows) {
+        if (!Array.isArray(tiles) || !Number.isInteger(cols) || !Number.isInteger(rows) || cols <= 2 || rows <= 2) {
+            return null;
+        }
+        const expected = cols * rows;
+        if (tiles.length === expected) {
+            return tiles.slice();
+        }
+
+        // Legacy malformed committed maps had one extra tile in each interior row.
+        if (tiles.length !== expected + (rows - 2)) {
+            return null;
+        }
+
+        const repaired = [];
+        let cursor = 0;
+
+        const firstRow = tiles.slice(cursor, cursor + cols);
+        if (firstRow.length !== cols) return null;
+        repaired.push(...firstRow);
+        cursor += cols;
+
+        const dropIndex = cols - 2;
+        for (let row = 1; row < rows - 1; row++) {
+            const paddedRow = tiles.slice(cursor, cursor + cols + 1);
+            if (paddedRow.length !== cols + 1) return null;
+
+            const repairedRow = paddedRow.slice(0, dropIndex).concat(paddedRow.slice(dropIndex + 1));
+            if (repairedRow.length !== cols) return null;
+
+            repaired.push(...repairedRow);
+            cursor += cols + 1;
+        }
+
+        const lastRow = tiles.slice(cursor, cursor + cols);
+        if (lastRow.length !== cols) return null;
+        repaired.push(...lastRow);
+        cursor += cols;
+
+        if (cursor !== tiles.length || repaired.length !== expected) {
+            return null;
+        }
+
+        return repaired;
     },
 
     mapToJson(mapData) {

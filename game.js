@@ -668,34 +668,70 @@ window.__setEnemiesDestroyed = function __setEnemiesDestroyed(count) {
     window.game.state.enemiesDestroyed = next;
 };
 
+function isEditorPreviewRequested() {
+    const params = new URLSearchParams(window.location.search || '');
+    return params.get('editorPreview') === '1';
+}
+
+function loadEditorPreviewMap() {
+    const text = localStorage.getItem(CONFIG.MAP_STORAGE_KEY);
+    if (!text) {
+        return MapFormat.createDefaultMapData();
+    }
+    return MapFormat.mapFromJson(text);
+}
+
 window.addEventListener('load', () => {
     window.game = null;
     let levelsCache = [];
+
+    const startGameWithMap = (mapData) => {
+        hideGameOverOverlay();
+        const game = new Game(mapData);
+        window.game = game;
+        game.init();
+        game.start();
+        hideLevelMenu();
+    };
 
     const startLevel = async (level) => {
         try {
             setLevelMenuStatus('Loading level...');
             const mapData = await loadLevelMap(level);
-            hideGameOverOverlay();
-
-            const game = new Game(mapData);
-            window.game = game;
-            game.init();
-            game.start();
-
-            hideLevelMenu();
+            startGameWithMap(mapData);
         } catch (error) {
             setLevelMenuStatus(error.message);
         }
     };
 
-    const returnToLevelSelect = () => {
+    const ensureLevelsCache = async () => {
+        if (levelsCache.length > 0) {
+            return;
+        }
+        try {
+            levelsCache = await loadLevelCatalog();
+        } catch (error) {
+            setLevelMenuStatus(error.message);
+            levelsCache = [
+                {
+                    id: 'fallback-default',
+                    name: 'Fallback Default',
+                    path: ''
+                }
+            ];
+            window.__testLevelMaps = window.__testLevelMaps || {};
+            window.__testLevelMaps['fallback-default'] = MapFormat.createDefaultMapData();
+        }
+    };
+
+    const returnToLevelSelect = async () => {
         const current = window.game;
         if (current) {
             current.isRunning = false;
         }
         window.game = null;
         hideGameOverOverlay();
+        await ensureLevelsCache();
         showLevelMenu(levelsCache, startLevel);
     };
 
@@ -720,33 +756,30 @@ window.addEventListener('load', () => {
 
     const levelSelectButton = document.getElementById('levelSelectButton');
     if (levelSelectButton) {
-        levelSelectButton.onclick = () => returnToLevelSelect();
+        levelSelectButton.onclick = () => {
+            void returnToLevelSelect();
+        };
     }
 
     window.addEventListener('keydown', (event) => {
         if (event.code === 'Escape' && window.game) {
             event.preventDefault();
-            returnToLevelSelect();
+            void returnToLevelSelect();
         }
     });
 
     (async () => {
-        try {
-            const levels = await loadLevelCatalog();
-            levelsCache = levels;
-            showLevelMenu(levelsCache, startLevel);
-        } catch (error) {
-            setLevelMenuStatus(error.message);
-            levelsCache = [
-                {
-                    id: 'fallback-default',
-                    name: 'Fallback Default',
-                    path: ''
-                }
-            ];
-            window.__testLevelMaps = window.__testLevelMaps || {};
-            window.__testLevelMaps['fallback-default'] = MapFormat.createDefaultMapData();
-            showLevelMenu(levelsCache, startLevel);
+        if (isEditorPreviewRequested()) {
+            try {
+                const previewMap = loadEditorPreviewMap();
+                startGameWithMap(previewMap);
+                return;
+            } catch (error) {
+                setLevelMenuStatus(`Editor preview failed: ${error.message}`);
+            }
         }
+
+        await ensureLevelsCache();
+        showLevelMenu(levelsCache, startLevel);
     })();
 });
