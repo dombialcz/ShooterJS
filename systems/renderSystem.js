@@ -20,6 +20,9 @@ const RenderSystem = {
 
         // Draw enemies
         this.drawEnemies(ctx, gameState);
+
+        // Draw enemy laser sights (orange windup lines)
+        this.drawLaserSights(ctx, gameState);
         
         // Draw tracer lines (bullet tracers)
         this.drawTracers(ctx, gameState);
@@ -166,6 +169,48 @@ const RenderSystem = {
             ctx.fillRect(barX, barY, barWidth, barHeight);
             ctx.fillStyle = healthRatio > 0.5 ? '#9df58b' : (healthRatio > 0.2 ? '#ffcf66' : '#ff6f6f');
             ctx.fillRect(barX, barY, barWidth * healthRatio, barHeight);
+        }
+    },
+
+    drawLaserSights(ctx, gameState) {
+        if (!Array.isArray(gameState.enemies) || !gameState.player) return;
+
+        const playerTransform = gameState.player.getComponent('transform');
+        if (!playerTransform) return;
+
+        for (const enemyEntity of gameState.enemies) {
+            const enemy = enemyEntity.getComponent('enemy');
+            const enemyTransform = enemyEntity.getComponent('transform');
+            const enemyHealth = enemyEntity.getComponent('health');
+            if (!enemy || !enemyTransform || !enemyHealth || enemyHealth.current <= 0) continue;
+            if (enemy.laserSightStartMs === null) continue;
+
+            const toPlayerX = playerTransform.x - enemyTransform.x;
+            const toPlayerY = playerTransform.y - enemyTransform.y;
+            const distance = Math.hypot(toPlayerX, toPlayerY);
+            // Clamp the laser to the enemy's attack range (min 100px for very close encounters)
+            const maxRange = Math.max(enemy.attackRange, 100);
+            const clampScale = distance > 0 ? Math.min(1, maxRange / distance) : 1;
+
+            const endX = enemyTransform.x + toPlayerX * clampScale;
+            const endY = enemyTransform.y + toPlayerY * clampScale;
+
+            const color = CONFIG.ENEMY_LASER_SIGHT_COLOR || '#ff8800';
+
+            ctx.save();
+            ctx.globalAlpha = 0.85;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.lineCap = 'round';
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = color;
+
+            ctx.beginPath();
+            ctx.moveTo(enemyTransform.x, enemyTransform.y);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            ctx.restore();
         }
     },
 

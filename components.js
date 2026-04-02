@@ -234,6 +234,7 @@ function Enemy(type, options = {}) {
         scoreValue: Number.isFinite(options.scoreValue) ? options.scoreValue : 25,
         pendingAttack: false,
         lastAttackAtMs: Number.NEGATIVE_INFINITY,
+        laserSightStartMs: null,
         firstShotMustMiss: enemyType === 'ranged',
         shotRngState: (options.shotRngState >>> 0) || 0,
         patrol: patrol,
