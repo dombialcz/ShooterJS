@@ -113,6 +113,7 @@ const EnemyCombatSystem = {
 
     applyPlayerDamage(gameState, playerHealth, damage) {
         playerHealth.current = Math.max(0, playerHealth.current - Math.max(0, damage || 0));
+        gameState.lastPlayerHitTimeMs = Date.now();
         if (playerHealth.current <= 0) {
             gameState.isGameOver = true;
             gameState.isLevelComplete = false;

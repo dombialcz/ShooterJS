@@ -93,6 +93,12 @@ const CONFIG = {
     HIT_MARKER_DURATION: 200, // milliseconds
     HIT_MARKER_COLOR: '#ffffff',
     HIT_MARKER_RADIUS: 10,
+
+    // Hit Vignette
+    HIT_VIGNETTE_FADE_IN_MS: 150,   // Time to fade in after a hit
+    HIT_VIGNETTE_HOLD_MS: 2000,     // Milliseconds of no damage before fade-out begins
+    HIT_VIGNETTE_FADE_OUT_MS: 1200, // Time to fade out
+    HIT_VIGNETTE_MAX_ALPHA: 0.55,   // Peak opacity of the red vignette
     
     // Rooms (for map generation)
     ROOM_SIZE: 200,
