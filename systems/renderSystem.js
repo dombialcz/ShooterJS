@@ -35,7 +35,10 @@ const RenderSystem = {
         
         // Apply darkness overlay (everything outside FOV)
         this.drawDarkness(ctx, gameState);
-        
+
+        // Draw red hit vignette when player takes damage
+        this.drawHitVignette(ctx, gameState);
+
         // Draw crosshair
         this.drawCrosshair(ctx, gameState);
 
@@ -330,7 +333,40 @@ const RenderSystem = {
         
         ctx.restore();
     },
-    
+
+    drawHitVignette(ctx, gameState) {
+        if (!gameState.lastPlayerHitTimeMs) return;
+
+        const elapsed = Date.now() - gameState.lastPlayerHitTimeMs;
+        const { HIT_VIGNETTE_FADE_IN_MS, HIT_VIGNETTE_HOLD_MS, HIT_VIGNETTE_FADE_OUT_MS, HIT_VIGNETTE_MAX_ALPHA } = CONFIG;
+        const totalHoldEnd = HIT_VIGNETTE_FADE_IN_MS + HIT_VIGNETTE_HOLD_MS;
+
+        let alpha;
+        if (elapsed < HIT_VIGNETTE_FADE_IN_MS) {
+            alpha = (elapsed / HIT_VIGNETTE_FADE_IN_MS) * HIT_VIGNETTE_MAX_ALPHA;
+        } else if (elapsed < totalHoldEnd) {
+            alpha = HIT_VIGNETTE_MAX_ALPHA;
+        } else if (elapsed < totalHoldEnd + HIT_VIGNETTE_FADE_OUT_MS) {
+            alpha = HIT_VIGNETTE_MAX_ALPHA * (1 - (elapsed - totalHoldEnd) / HIT_VIGNETTE_FADE_OUT_MS);
+        } else {
+            return;
+        }
+
+        const cx = CONFIG.CANVAS_WIDTH / 2;
+        const cy = CONFIG.CANVAS_HEIGHT / 2;
+        const outerRadius = Math.hypot(cx, cy);
+        const innerRadius = outerRadius * 0.45;
+
+        const gradient = ctx.createRadialGradient(cx, cy, innerRadius, cx, cy, outerRadius);
+        gradient.addColorStop(0, 'rgba(180, 0, 0, 0)');
+        gradient.addColorStop(1, `rgba(180, 0, 0, ${alpha})`);
+
+        ctx.save();
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        ctx.restore();
+    },
+
     drawCrosshair(ctx, gameState) {
         if (!gameState.player) return;
         
