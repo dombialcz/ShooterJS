@@ -41,7 +41,8 @@ describe('EnemyCombatSystem', () => {
       lastAttackAtMs: Number.NEGATIVE_INFINITY,
       damage: 10,
       firstShotMustMiss: true,
-      shotRngState: 1
+      shotRngState: 1,
+      laserSightStartMs: null
     };
 
     const gameState = {
@@ -64,13 +65,27 @@ describe('EnemyCombatSystem', () => {
       addEntity() {}
     };
 
+    // First update starts the laser sight windup - nothing fires yet
+    EnemyCombatSystem.update(gameState, 1 / 60);
+    expect(playerHealth.current).toBe(100);
+    expect(enemy.firstShotMustMiss).toBe(true);
+
+    // After 300ms windup the first shot fires and must miss
+    enemy.pendingAttack = true;
+    gameState.timeMs += 300;
     EnemyCombatSystem.update(gameState, 1 / 60);
     expect(playerHealth.current).toBe(100);
     expect(enemy.firstShotMustMiss).toBe(false);
 
+    // Start second windup (past cooldown)
     enemy.pendingAttack = true;
     enemy.shotRngState = 682; // first random after this seed is > 0.5 (hit branch)
     gameState.timeMs += 250;
+    EnemyCombatSystem.update(gameState, 1 / 60);
+
+    // After another 300ms the second shot fires and should hit
+    enemy.pendingAttack = true;
+    gameState.timeMs += 300;
     EnemyCombatSystem.update(gameState, 1 / 60);
     expect(playerHealth.current).toBe(90);
   });
@@ -86,7 +101,8 @@ describe('EnemyCombatSystem', () => {
         lastAttackAtMs: Number.NEGATIVE_INFINITY,
         damage: 10,
         firstShotMustMiss: true,
-        shotRngState: 2000
+        shotRngState: 2000,
+        laserSightStartMs: null
       };
 
       const gameState = {

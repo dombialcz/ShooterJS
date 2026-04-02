@@ -25,7 +25,33 @@ const EnemyCombatSystem = {
             const enemyTransform = enemyEntity.getComponent('transform');
             const enemyCollision = enemyEntity.getComponent('collision');
             const enemyHealth = enemyEntity.getComponent('health');
-            if (!enemy || !enemyTransform || !enemyCollision || !enemyHealth || enemyHealth.current <= 0) continue;
+            if (!enemy || !enemyTransform || !enemyCollision || !enemyHealth || enemyHealth.current <= 0) {
+                if (enemy) enemy.laserSightStartMs = null;
+                continue;
+            }
+
+            // Handle active laser sight windup for ranged enemies
+            if (enemy.type === 'ranged' && enemy.laserSightStartMs !== null) {
+                if (!enemy.pendingAttack) {
+                    // Lost target during windup - cancel laser sight
+                    enemy.laserSightStartMs = null;
+                    continue;
+                }
+
+                const windupElapsed = now - enemy.laserSightStartMs;
+                if (windupElapsed < (CONFIG.ENEMY_LASER_SIGHT_WINDUP_MS || 300)) {
+                    // Still in windup - keep laser sight visible, don't fire yet
+                    continue;
+                }
+
+                // Windup complete - fire!
+                this.resolveRangedAttack(gameState, enemy, enemyTransform, playerTransform, playerCollision, playerHealth, visibilityUtils);
+                enemy.lastAttackAtMs = now;
+                enemy.laserSightStartMs = null;
+                enemy.pendingAttack = false;
+                continue;
+            }
+
             if (!enemy.pendingAttack) continue;
 
             const elapsed = now - (enemy.lastAttackAtMs || 0);
@@ -41,9 +67,8 @@ const EnemyCombatSystem = {
                 continue;
             }
 
-            this.resolveRangedAttack(gameState, enemy, enemyTransform, playerTransform, playerCollision, playerHealth, visibilityUtils);
-            enemy.lastAttackAtMs = now;
-            enemy.pendingAttack = false;
+            // Start laser sight windup for ranged enemy
+            enemy.laserSightStartMs = now;
         }
     },
 
@@ -102,8 +127,9 @@ const EnemyCombatSystem = {
             this.applyPlayerDamage(gameState, playerHealth, enemy.damage);
         }
 
-        const tracerColor = hitsPlayer ? '#ff6868' : '#ffb357';
-        const tracer = createTracerLine(startX, startY, finalX, finalY, tracerColor);
+        const tracerColor = CONFIG.ENEMY_LASER_SHOT_COLOR || '#ff2222';
+        const tracerDuration = CONFIG.ENEMY_LASER_SIGHT_SHOT_DURATION_MS || 400;
+        const tracer = createTracerLine(startX, startY, finalX, finalY, tracerColor, tracerDuration);
         const tracerLifetime = tracer.getComponent('lifetime');
         if (tracerLifetime) {
             tracerLifetime.createdAt = gameState.timeMs ?? Date.now();
