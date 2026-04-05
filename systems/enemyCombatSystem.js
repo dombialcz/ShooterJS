@@ -35,7 +35,15 @@ const EnemyCombatSystem = {
                 if (!enemy.pendingAttack) {
                     // Lost target during windup - cancel laser sight
                     enemy.laserSightStartMs = null;
+                    enemy.aimAngle = null;
+                    enemy.lastAimUpdateMs = null;
                     continue;
+                }
+
+                const aimInterval = CONFIG.ENEMY_AIM_UPDATE_INTERVAL_MS || 100;
+                // Re-randomize aim direction every aimInterval ms for the warning laser display
+                if (enemy.lastAimUpdateMs === null || now - enemy.lastAimUpdateMs >= aimInterval) {
+                    this.updateEnemyAim(enemy, enemyTransform, playerTransform, now);
                 }
 
                 const windupElapsed = now - enemy.laserSightStartMs;
@@ -44,10 +52,12 @@ const EnemyCombatSystem = {
                     continue;
                 }
 
-                // Windup complete - fire!
+                // Windup complete - fire at the last randomized aim angle!
                 this.resolveRangedAttack(gameState, enemy, enemyTransform, playerTransform, playerCollision, playerHealth, visibilityUtils);
                 enemy.lastAttackAtMs = now;
                 enemy.laserSightStartMs = null;
+                enemy.aimAngle = null;
+                enemy.lastAimUpdateMs = null;
                 enemy.pendingAttack = false;
                 continue;
             }
@@ -69,7 +79,30 @@ const EnemyCombatSystem = {
 
             // Start laser sight windup for ranged enemy
             enemy.laserSightStartMs = now;
+            // Immediately compute first aim direction so the laser sight shows randomized aim from the start of windup
+            this.updateEnemyAim(enemy, enemyTransform, playerTransform, now);
         }
+    },
+
+    updateEnemyAim(enemy, enemyTransform, playerTransform, now) {
+        const toPlayerX = playerTransform.x - enemyTransform.x;
+        const toPlayerY = playerTransform.y - enemyTransform.y;
+        let angle = Math.atan2(toPlayerY, toPlayerX);
+
+        let shouldMiss;
+        if (enemy.firstShotMustMiss) {
+            shouldMiss = true;
+        } else {
+            shouldMiss = this.nextEnemyRandom(enemy) < 0.5;
+        }
+
+        if (shouldMiss) {
+            const missOffset = (this.nextEnemyRandom(enemy) * 2 - 1) * (CONFIG.ENEMY_SHOT_MISS_MAX_OFFSET_RAD || 0.34);
+            angle += missOffset;
+        }
+
+        enemy.aimAngle = angle;
+        enemy.lastAimUpdateMs = now;
     },
 
     resolveMeleeAttack(gameState, enemy, enemyTransform, enemyCollision, playerTransform, playerCollision, playerHealth) {
@@ -87,19 +120,13 @@ const EnemyCombatSystem = {
         const distanceToPlayer = Math.hypot(toPlayerX, toPlayerY);
         if (distanceToPlayer > enemy.attackRange) return;
 
-        let shotAngle = Math.atan2(toPlayerY, toPlayerX);
-        let shouldMiss = false;
-        if (enemy.firstShotMustMiss) {
-            shouldMiss = true;
-            enemy.firstShotMustMiss = false;
-        } else {
-            shouldMiss = this.nextEnemyRandom(enemy) < 0.5;
-        }
+        // Use the pre-randomized aim angle set during windup; fall back to player direction
+        const shotAngle = (enemy.aimAngle !== null && enemy.aimAngle !== undefined)
+            ? enemy.aimAngle
+            : Math.atan2(toPlayerY, toPlayerX);
 
-        if (shouldMiss) {
-            const missOffset = (this.nextEnemyRandom(enemy) * 2 - 1) * (CONFIG.ENEMY_SHOT_MISS_MAX_OFFSET_RAD || 0.34);
-            shotAngle += missOffset;
-        }
+        // Mark first shot as fired
+        enemy.firstShotMustMiss = false;
 
         const maxRange = Math.max(enemy.attackRange, 100);
         const startX = enemyTransform.x;
@@ -120,7 +147,7 @@ const EnemyCombatSystem = {
             finalY = obstacleHit.y;
         }
 
-        const hitsPlayer = !shouldMiss && playerHit && playerHit.t >= 0 && playerHit.t <= 1 && playerHit.t < obstacleT;
+        const hitsPlayer = playerHit && playerHit.t >= 0 && playerHit.t <= 1 && playerHit.t < obstacleT;
         if (hitsPlayer) {
             finalX = playerHit.x;
             finalY = playerHit.y;
