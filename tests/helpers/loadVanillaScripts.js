@@ -18,7 +18,22 @@ function loadScripts(relativePaths, contextExtras = {}) {
       DOOR_WIDTH: 60,
       WALL_THICKNESS: 10,
       VISION_RANGE: 600,
-      RAY_COUNT: 60
+      RAY_COUNT: 60,
+      // Gun
+      GUN_LENGTH: 20,
+      GUN_WIDTH: 8,
+      GUN_OFFSET_X: 15,
+      GUN_COLOR: '#1a1a1a',
+      GUN_FIRE_RATE: 200,
+      FIRING_CONE_START_DEG: 20,
+      // Melee
+      MELEE_DAMAGE: 35,
+      MELEE_RANGE: 60,
+      MELEE_COOLDOWN_MS: 600,
+      MELEE_LENGTH: 28,
+      MELEE_WIDTH: 6,
+      MELEE_COLOR: '#b0b0b0',
+      MELEE_SWING_DURATION_MS: 250
     },
     ...contextExtras
   };
@@ -37,7 +52,11 @@ function loadScripts(relativePaths, contextExtras = {}) {
     'DoorSystem',
     'MapFormat',
     'MapBuildUtils',
-    'SimulationCore'
+    'SimulationCore',
+    'createWeaponBase',
+    'createGunWeapon',
+    'createMeleeWeapon',
+    'createWeapon'
   ];
 
   for (const symbol of knownSymbols) {

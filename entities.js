@@ -39,12 +39,13 @@ function createPlayer(x, y) {
     player.addComponent('physics', Physics(CONFIG.PLAYER_SPEED));
     player.addComponent('collision', CollisionCircle(CONFIG.PLAYER_RADIUS));
     player.addComponent('renderable', Renderable('circle', CONFIG.PLAYER_COLOR, CONFIG.PLAYER_RADIUS));
-    player.addComponent('gun', Gun(
-        CONFIG.GUN_LENGTH,
-        CONFIG.GUN_WIDTH,
-        CONFIG.GUN_OFFSET_X,
-        0
-    ));
+    player.addComponent('gun', createWeapon('gun', {
+        length: CONFIG.GUN_LENGTH,
+        width: CONFIG.GUN_WIDTH,
+        offsetX: CONFIG.GUN_OFFSET_X,
+        offsetY: 0
+    }));
+    player.addComponent('melee', createWeapon('melee'));
     player.addComponent('vision', Vision(
         CONFIG.VISION_RANGE,
         CONFIG.FOV_NORMAL,
