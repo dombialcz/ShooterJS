@@ -38,7 +38,7 @@ const InputSystem = {
         this.inputState.keys.add(e.code);
         
         // Prevent default behavior for game keys
-        if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'].includes(e.code)) {
+        if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'Digit1', 'Digit2'].includes(e.code)) {
             e.preventDefault();
         }
     },
@@ -116,9 +116,23 @@ const InputSystem = {
         const mouse = this.inputState.mouse;
         const shouldFireOnRelease = mouse.releaseShotPending;
 
+        // Weapon switching (keys 1 = gun, 2 = melee)
+        let weaponSwitch = null;
+        if (this.inputState.keys.has('Digit1')) {
+            weaponSwitch = 'gun';
+        } else if (this.inputState.keys.has('Digit2')) {
+            weaponSwitch = 'melee';
+        }
+        input.weaponSwitch = weaponSwitch;
+        if (weaponSwitch && playerState) {
+            playerState.activeWeapon = weaponSwitch;
+        }
+
         // Left mouse drives the full ADS/fire flow:
         // hold to ADS, release to fire once, then clear on the next frame.
-        input.isADS = mouse.isLeftHeld || shouldFireOnRelease;
+        // ADS only applies to the gun weapon.
+        const isGun = !playerState || playerState.activeWeapon === 'gun';
+        input.isADS = isGun && (mouse.isLeftHeld || shouldFireOnRelease);
         input.isShooting = shouldFireOnRelease;
         mouse.releaseShotPending = false;
 
