@@ -11,7 +11,8 @@ function makeEntity(components) {
 describe('EnemyCombatSystem', () => {
   beforeEach(() => {
     global.CONFIG = {
-      ENEMY_SHOT_MISS_MAX_OFFSET_RAD: 0.34
+      ENEMY_SHOT_MISS_MAX_OFFSET_RAD: 0.34,
+      ENEMY_AIM_UPDATE_INTERVAL_MS: 100
     };
     global.createTracerLine = (x1, y1, x2, y2, color) => {
       const lifetime = { createdAt: 0, duration: 100 };
@@ -42,7 +43,9 @@ describe('EnemyCombatSystem', () => {
       damage: 10,
       firstShotMustMiss: true,
       shotRngState: 1,
-      laserSightStartMs: null
+      laserSightStartMs: null,
+      aimAngle: null,
+      lastAimUpdateMs: null
     };
 
     const gameState = {
@@ -79,7 +82,7 @@ describe('EnemyCombatSystem', () => {
 
     // Start second windup (past cooldown)
     enemy.pendingAttack = true;
-    enemy.shotRngState = 682; // first random after this seed is > 0.5 (hit branch)
+    enemy.shotRngState = 1; // aim updates at windup-start and fire-time both roll >= 0.5 → hit
     gameState.timeMs += 250;
     EnemyCombatSystem.update(gameState, 1 / 60);
 
@@ -88,6 +91,72 @@ describe('EnemyCombatSystem', () => {
     gameState.timeMs += 300;
     EnemyCombatSystem.update(gameState, 1 / 60);
     expect(playerHealth.current).toBe(90);
+  });
+
+  it('updates aim direction every 100ms during windup using yellow warning laser', () => {
+    const enemy = {
+      type: 'ranged',
+      pendingAttack: true,
+      attackRange: 500,
+      attackCooldownMs: 200,
+      lastAttackAtMs: Number.NEGATIVE_INFINITY,
+      damage: 10,
+      firstShotMustMiss: false,
+      shotRngState: 1,
+      laserSightStartMs: null,
+      aimAngle: null,
+      lastAimUpdateMs: null
+    };
+
+    const gameState = {
+      timeMs: 1000,
+      walls: [],
+      doors: [],
+      blocks: [],
+      entities: new Map(),
+      enemies: [makeEntity({
+        transform: { x: 0, y: 0 },
+        collision: { type: 'circle', radius: 10 },
+        health: { current: 30, max: 30 },
+        enemy
+      })],
+      player: makeEntity({
+        transform: { x: 200, y: 0 },
+        collision: { type: 'circle', radius: 10 },
+        health: { current: 100, max: 100 }
+      }),
+      addEntity() {}
+    };
+
+    // First update: starts windup and immediately computes first aim
+    EnemyCombatSystem.update(gameState, 1 / 60);
+    expect(enemy.laserSightStartMs).toBe(1000);
+    expect(enemy.aimAngle).not.toBeNull();
+    expect(enemy.lastAimUpdateMs).toBe(1000);
+    const firstAimAngle = enemy.aimAngle;
+
+    // 50ms later: still in windup, too soon for another aim update (< 100ms interval)
+    enemy.pendingAttack = true;
+    gameState.timeMs += 50;
+    EnemyCombatSystem.update(gameState, 1 / 60);
+    expect(enemy.laserSightStartMs).toBe(1000);
+    expect(enemy.aimAngle).toBe(firstAimAngle); // unchanged - interval not yet reached
+
+    // 100ms after last update: aim is re-randomized
+    enemy.pendingAttack = true;
+    gameState.timeMs += 50; // now 100ms since lastAimUpdateMs
+    EnemyCombatSystem.update(gameState, 1 / 60);
+    expect(enemy.lastAimUpdateMs).toBe(1100);
+    // aimAngle may or may not differ from firstAimAngle depending on RNG, but it was re-evaluated
+    expect(enemy.laserSightStartMs).toBe(1000); // still in windup (only 100ms elapsed)
+
+    // After full 300ms windup: fires using the last computed aim angle
+    enemy.pendingAttack = true;
+    gameState.timeMs += 200; // now 300ms since windup start
+    EnemyCombatSystem.update(gameState, 1 / 60);
+    expect(enemy.laserSightStartMs).toBeNull(); // windup cleared after firing
+    expect(enemy.aimAngle).toBeNull();          // aim cleared after firing
+    expect(enemy.lastAimUpdateMs).toBeNull();   // timestamp cleared after firing
   });
 
   it('replays ranged hit/miss sequence deterministically for the same seed', () => {
@@ -102,7 +171,9 @@ describe('EnemyCombatSystem', () => {
         damage: 10,
         firstShotMustMiss: true,
         shotRngState: 2000,
-        laserSightStartMs: null
+        laserSightStartMs: null,
+        aimAngle: null,
+        lastAimUpdateMs: null
       };
 
       const gameState = {

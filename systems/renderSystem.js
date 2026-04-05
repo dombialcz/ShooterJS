@@ -188,15 +188,22 @@ const RenderSystem = {
             if (!enemy || !enemyTransform || !enemyHealth || enemyHealth.current <= 0) continue;
             if (enemy.laserSightStartMs === null) continue;
 
-            const toPlayerX = playerTransform.x - enemyTransform.x;
-            const toPlayerY = playerTransform.y - enemyTransform.y;
-            const distance = Math.hypot(toPlayerX, toPlayerY);
-            // Clamp the laser to the enemy's attack range (min 100px for very close encounters)
             const maxRange = Math.max(enemy.attackRange, 100);
-            const clampScale = distance > 0 ? Math.min(1, maxRange / distance) : 1;
+            let endX, endY;
 
-            const endX = enemyTransform.x + toPlayerX * clampScale;
-            const endY = enemyTransform.y + toPlayerY * clampScale;
+            if (enemy.aimAngle !== null && enemy.aimAngle !== undefined) {
+                // Draw toward the current randomized aim direction
+                endX = enemyTransform.x + Math.cos(enemy.aimAngle) * maxRange;
+                endY = enemyTransform.y + Math.sin(enemy.aimAngle) * maxRange;
+            } else {
+                // Fallback: point toward player
+                const toPlayerX = playerTransform.x - enemyTransform.x;
+                const toPlayerY = playerTransform.y - enemyTransform.y;
+                const distance = Math.hypot(toPlayerX, toPlayerY);
+                const clampScale = distance > 0 ? Math.min(1, maxRange / distance) : 1;
+                endX = enemyTransform.x + toPlayerX * clampScale;
+                endY = enemyTransform.y + toPlayerY * clampScale;
+            }
 
             const color = CONFIG.ENEMY_LASER_SIGHT_COLOR || '#ff8800';
 

@@ -235,6 +235,8 @@ function Enemy(type, options = {}) {
         pendingAttack: false,
         lastAttackAtMs: Number.NEGATIVE_INFINITY,
         laserSightStartMs: null,
+        aimAngle: null,
+        lastAimUpdateMs: null,
         firstShotMustMiss: enemyType === 'ranged',
         shotRngState: (options.shotRngState >>> 0) || 0,
         patrol: patrol,
