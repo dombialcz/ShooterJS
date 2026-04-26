@@ -11,6 +11,38 @@ function getMapRuntimeConfig() {
     };
 }
 
+function normalizeInfo(rawInfo) {
+    if (!rawInfo || typeof rawInfo !== 'object') {
+        return null;
+    }
+
+    const title = typeof rawInfo.title === 'string' ? rawInfo.title.trim() : '';
+    const body = Array.isArray(rawInfo.body)
+        ? rawInfo.body
+            .filter((entry) => typeof entry === 'string' && entry.trim().length > 0)
+            .map((entry) => entry.trim())
+        : [];
+
+    if (!title && body.length === 0) {
+        return null;
+    }
+
+    return { title, body };
+}
+
+function normalizeVictoryArea(rawArea) {
+    if (!rawArea || typeof rawArea !== 'object') {
+        return null;
+    }
+
+    return {
+        col: Number.isInteger(rawArea.col) ? rawArea.col : 0,
+        row: Number.isInteger(rawArea.row) ? rawArea.row : 0,
+        width: Number.isInteger(rawArea.width) && rawArea.width > 0 ? rawArea.width : 1,
+        height: Number.isInteger(rawArea.height) && rawArea.height > 0 ? rawArea.height : 1
+    };
+}
+
 const MapFormat = {
     VERSION: 1,
     TILE_EMPTY: 0,
@@ -129,6 +161,14 @@ const MapFormat = {
                 { col: 15, row: 14 },
                 { col: 26, row: 13 }
             ],
+            victoryArea: { col: 28, row: 14, width: 2, height: 2 },
+            info: {
+                title: 'Training Start',
+                body: [
+                    'Eliminate the required targets before time runs out.',
+                    'Reach the green extraction zone after meeting the goal to complete the level.'
+                ]
+            },
             enemies: []
         };
     },
@@ -213,6 +253,23 @@ const MapFormat = {
             errors.push('meta.name must be a string when provided.');
         }
 
+        if (raw.info !== undefined && raw.info !== null) {
+            if (typeof raw.info !== 'object') {
+                errors.push('info must be an object when provided.');
+            } else {
+                if (raw.info.title !== undefined && typeof raw.info.title !== 'string') {
+                    errors.push('info.title must be a string when provided.');
+                }
+                if (raw.info.body !== undefined) {
+                    if (!Array.isArray(raw.info.body)) {
+                        errors.push('info.body must be an array when provided.');
+                    } else if (raw.info.body.some((entry) => typeof entry !== 'string')) {
+                        errors.push('info.body entries must be strings.');
+                    }
+                }
+            }
+        }
+
         if (raw.settings !== undefined) {
             if (typeof raw.settings !== 'object' || raw.settings === null) {
                 errors.push('settings must be an object when provided.');
@@ -241,6 +298,27 @@ const MapFormat = {
                         break;
                     }
                 }
+            }
+        }
+
+        if (raw.victoryArea !== undefined && raw.victoryArea !== null) {
+            const area = raw.victoryArea;
+            if (
+                typeof area !== 'object'
+                || !Number.isInteger(area.col)
+                || !Number.isInteger(area.row)
+                || !Number.isInteger(area.width)
+                || !Number.isInteger(area.height)
+                || area.width <= 0
+                || area.height <= 0
+            ) {
+                errors.push('victoryArea must include integer col, row, width and height.');
+            } else if (
+                Number.isInteger(raw.cols)
+                && Number.isInteger(raw.rows)
+                && (area.col < 0 || area.row < 0 || area.col + area.width > raw.cols || area.row + area.height > raw.rows)
+            ) {
+                errors.push('victoryArea must fit inside map bounds.');
             }
         }
 
@@ -304,6 +382,7 @@ const MapFormat = {
         const candidate = {
             version: this.VERSION,
             meta: typeof raw?.meta === 'object' && raw.meta !== null ? { ...raw.meta } : { ...base.meta },
+            info: normalizeInfo(raw?.info),
             settings: {
                 timeLimitMs: Number.isInteger(raw?.settings?.timeLimitMs) && raw.settings.timeLimitMs > 0
                     ? raw.settings.timeLimitMs
@@ -322,6 +401,7 @@ const MapFormat = {
                 row: Number.isInteger(raw?.playerSpawn?.row) ? raw.playerSpawn.row : base.playerSpawn.row
             },
             targetSpawns: Array.isArray(raw?.targetSpawns) ? raw.targetSpawns.slice() : base.targetSpawns.slice(),
+            victoryArea: raw?.victoryArea !== undefined ? normalizeVictoryArea(raw.victoryArea) : null,
             enemies: Array.isArray(raw?.enemies)
                 ? raw.enemies
                     .filter((enemy) => enemy && typeof enemy === 'object')

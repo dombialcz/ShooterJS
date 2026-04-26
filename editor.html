@@ -20,6 +20,7 @@
                     <button data-tool="erase">Erase</button>
                     <button data-tool="player">Player Spawn</button>
                     <button data-tool="target">Target Spawn</button>
+                    <button data-tool="victory">Victory Area</button>
                     <button data-tool="enemyMelee">Enemy: Melee</button>
                     <button data-tool="enemyRanged">Enemy: Ranged</button>
                     <button data-tool="patrol">Patrol Path</button>
@@ -38,6 +39,12 @@
                 </label>
                 <label>Max Targets To Kill
                     <input id="maxTargetsToKill" type="number" min="1" step="1">
+                </label>
+                <label>Info Title
+                    <input id="infoTitle" type="text" maxlength="80">
+                </label>
+                <label>Info Body
+                    <textarea id="infoBody" spellcheck="false" rows="5"></textarea>
                 </label>
             </section>
 

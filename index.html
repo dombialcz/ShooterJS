@@ -232,6 +232,64 @@
             margin: 0;
             font-size: 14px;
         }
+
+        #infoOverlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            background: rgba(9, 11, 16, 0.78);
+            pointer-events: all;
+        }
+
+        #infoOverlay.visible {
+            display: flex;
+        }
+
+        .info-box {
+            width: min(640px, 88vw);
+            max-height: 78vh;
+            overflow-y: auto;
+            border: 1px solid #5a6a7e;
+            background: #111721;
+            border-radius: 8px;
+            padding: 22px;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+        }
+
+        .info-box h2 {
+            font-size: 28px;
+            margin-bottom: 14px;
+            color: #f7f7f7;
+        }
+
+        #infoBody {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 18px;
+            color: #dfe8f3;
+            font-size: 16px;
+            line-height: 1.45;
+        }
+
+        #infoStartButton {
+            font-size: 18px;
+            padding: 10px 18px;
+            background: #53d969;
+            color: #07110a;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            pointer-events: all;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
+        #infoStartButton:hover {
+            background: #74ee87;
+        }
     </style>
 </head>
 <body>
@@ -256,6 +314,13 @@
                     <h2>Select Level</h2>
                     <div id="levelList" class="level-list"></div>
                     <p id="levelMenuStatus"></p>
+                </div>
+            </div>
+            <div id="infoOverlay">
+                <div class="info-box">
+                    <h2 id="infoTitle">Mission Briefing</h2>
+                    <div id="infoBody"></div>
+                    <button id="infoStartButton">START</button>
                 </div>
             </div>
         </div>

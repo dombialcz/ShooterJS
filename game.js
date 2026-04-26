@@ -29,6 +29,7 @@ class GameState {
         this.initialEnemyCount = 0;
         this.gameOverReason = null;
         this.hasDisplayedGameOver = false;
+        this.hasReachedVictoryArea = false;
     }
 
     addEntity(entity) {
@@ -376,7 +377,8 @@ class Game {
             this.state.isLevelComplete = false;
             this.state.gameOverReason = 'player_dead';
         }
-        if (!this.state.isGameOver && this.state.getTotalEliminations() >= this.state.levelGoalTargets) {
+        this.state.hasReachedVictoryArea = this.isPlayerInsideVictoryArea();
+        if (!this.state.isGameOver && this.hasMetLevelCompletionGoal()) {
             this.state.isLevelComplete = true;
             this.state.isGameOver = true;
             this.state.gameOverReason = 'level_complete';
@@ -529,6 +531,34 @@ class Game {
         };
     }
 
+    hasMetLevelCompletionGoal() {
+        const hasEnoughEliminations = this.state.getTotalEliminations() >= this.state.levelGoalTargets;
+        const victoryArea = this.state.currentMapData?.victoryArea;
+        if (!victoryArea) {
+            return hasEnoughEliminations;
+        }
+        return hasEnoughEliminations && this.state.hasReachedVictoryArea;
+    }
+
+    isPlayerInsideVictoryArea() {
+        const area = this.state.currentMapData?.victoryArea;
+        if (!area || !this.state.player) return false;
+
+        const transform = this.state.player.getComponent('transform');
+        if (!transform) return false;
+
+        const tile = this.state.currentMapData.tileSize;
+        const left = area.col * tile;
+        const top = area.row * tile;
+        const right = left + area.width * tile;
+        const bottom = top + area.height * tile;
+
+        return transform.x >= left
+            && transform.x <= right
+            && transform.y >= top
+            && transform.y <= bottom;
+    }
+
     syncHUD() {
         const scoreValue = document.getElementById('scoreValue');
         if (scoreValue) {
@@ -549,7 +579,10 @@ class Game {
         if (goalValue) {
             const eliminations = this.state.getTotalEliminations();
             if (Number.isFinite(this.state.levelGoalTargets)) {
-                goalValue.textContent = `${eliminations}/${this.state.levelGoalTargets}`;
+                const baseGoal = `${eliminations}/${this.state.levelGoalTargets}`;
+                goalValue.textContent = this.state.currentMapData?.victoryArea
+                    ? `${baseGoal} + ${this.state.hasReachedVictoryArea ? 'EXIT OK' : 'EXIT'}`
+                    : baseGoal;
             } else {
                 goalValue.textContent = `${eliminations}/∞`;
             }
@@ -627,6 +660,64 @@ function hideGameOverOverlay() {
     }
 }
 
+function getDefaultLevelInfo(mapData) {
+    const timeLimit = RoundUtils.formatCountdown(mapData?.settings?.timeLimitMs || CONFIG.ROUND_DURATION_MS);
+    const goal = mapData?.settings?.maxTargetsToKill || CONFIG.DEFAULT_LEVEL_GOAL_KILLS;
+    const lines = [
+        `Time limit: ${timeLimit}.`,
+        `Elimination goal: ${goal}.`,
+        mapData?.victoryArea
+            ? 'After meeting the goal, reach the green EXIT area to win.'
+            : 'Meet the elimination goal before the timer expires.'
+    ];
+    return {
+        title: mapData?.meta?.name || 'Mission Briefing',
+        body: lines
+    };
+}
+
+function showInfoOverlay(mapData, game) {
+    const overlay = document.getElementById('infoOverlay');
+    const titleEl = document.getElementById('infoTitle');
+    const bodyEl = document.getElementById('infoBody');
+    if (!overlay || !bodyEl) return;
+
+    const configuredInfo = mapData?.info;
+    const info = configuredInfo && (configuredInfo.title || (Array.isArray(configuredInfo.body) && configuredInfo.body.length > 0))
+        ? configuredInfo
+        : getDefaultLevelInfo(mapData);
+
+    if (titleEl) {
+        titleEl.textContent = info.title || mapData?.meta?.name || 'Mission Briefing';
+    }
+    bodyEl.innerHTML = '';
+    const lines = Array.isArray(info.body) ? info.body : [];
+    for (const line of lines) {
+        const paragraph = document.createElement('p');
+        paragraph.textContent = line;
+        bodyEl.appendChild(paragraph);
+    }
+
+    if (game?.state) {
+        game.state.isPaused = true;
+    }
+    overlay.classList.add('visible');
+}
+
+function dismissInfoOverlay() {
+    const overlay = document.getElementById('infoOverlay');
+    if (overlay) {
+        overlay.classList.remove('visible');
+    }
+    if (window.game?.state) {
+        window.game.state.isPaused = false;
+    }
+}
+
+function isInfoOverlayVisible() {
+    return Boolean(document.getElementById('infoOverlay')?.classList.contains('visible'));
+}
+
 window.loadMapFromJson = function loadMapFromJson(text) {
     const map = MapFormat.mapFromJson(text);
     localStorage.setItem(CONFIG.MAP_STORAGE_KEY, MapFormat.mapToJson(map));
@@ -687,11 +778,13 @@ window.addEventListener('load', () => {
 
     const startGameWithMap = (mapData) => {
         hideGameOverOverlay();
+        dismissInfoOverlay();
         const game = new Game(mapData);
         window.game = game;
         game.init();
         game.start();
         hideLevelMenu();
+        showInfoOverlay(game.state.currentMapData, game);
     };
 
     const startLevel = async (level) => {
@@ -731,6 +824,7 @@ window.addEventListener('load', () => {
         }
         window.game = null;
         hideGameOverOverlay();
+        dismissInfoOverlay();
         await ensureLevelsCache();
         showLevelMenu(levelsCache, startLevel);
     };
@@ -739,6 +833,9 @@ window.addEventListener('load', () => {
         const game = window.game;
         if (!game) {
             throw new Error('No active level. Select a level first.');
+        }
+        if (isInfoOverlayVisible()) {
+            dismissInfoOverlay();
         }
         game.advanceTime(ms, Object.assign({ skipDOM: true }, options));
     };
@@ -759,6 +856,11 @@ window.addEventListener('load', () => {
         levelSelectButton.onclick = () => {
             void returnToLevelSelect();
         };
+    }
+
+    const infoStartButton = document.getElementById('infoStartButton');
+    if (infoStartButton) {
+        infoStartButton.onclick = () => dismissInfoOverlay();
     }
 
     window.addEventListener('keydown', (event) => {

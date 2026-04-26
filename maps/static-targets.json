@@ -66,5 +66,20 @@
     { "col": 26, "row": 4 },
     { "col": 15, "row": 14 },
     { "col": 26, "row": 13 }
-  ]
+  ],
+  "victoryArea": {
+    "col": 28,
+    "row": 14,
+    "width": 2,
+    "height": 2
+  },
+  "info": {
+    "title": "Static Targets",
+    "body": [
+      "Goal: eliminate 5 targets, then reach the green EXIT area.",
+      "Time limit: 2:00.",
+      "Move with W, A, S, D.",
+      "Hold the mouse button to aim and fire. The longer you hold it, the tighter your precision becomes."
+    ]
+  }
 }

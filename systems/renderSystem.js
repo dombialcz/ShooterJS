@@ -14,6 +14,9 @@ const RenderSystem = {
 
         // Draw pushable blocks
         this.drawBlocks(ctx, gameState);
+
+        // Draw extraction zone
+        this.drawVictoryArea(ctx, gameState);
         
         // Draw targets
         this.drawTargets(ctx, gameState);
@@ -243,6 +246,32 @@ const RenderSystem = {
             ctx.lineWidth = 2;
             ctx.strokeRect(x + 1, y + 1, collision.width - 2, collision.height - 2);
         }
+    },
+
+    drawVictoryArea(ctx, gameState) {
+        const area = gameState.currentMapData?.victoryArea;
+        if (!area) return;
+
+        const tile = gameState.currentMapData.tileSize || CONFIG.MAP_TILE_SIZE;
+        const x = area.col * tile;
+        const y = area.row * tile;
+        const width = area.width * tile;
+        const height = area.height * tile;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(83, 217, 105, 0.24)';
+        ctx.strokeStyle = '#53d969';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 6]);
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeRect(x + 2, y + 2, width - 4, height - 4);
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(215, 255, 220, 0.9)';
+        ctx.font = '14px Courier New, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('EXIT', x + width / 2, y + height / 2);
+        ctx.restore();
     },
     
     drawTracers(ctx, gameState) {

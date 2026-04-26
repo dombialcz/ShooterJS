@@ -223,7 +223,8 @@ const SimulationCore = {
                 durationMs: Math.max(0, Math.round(gameState.roundDurationMs || 0)),
                 isExpired: Boolean((gameState.roundTimeRemainingMs || 0) <= 0 || gameState.isGameOver),
                 isLevelComplete: Boolean(gameState.isLevelComplete),
-                gameOverReason: gameState.gameOverReason || null
+                gameOverReason: gameState.gameOverReason || null,
+                hasReachedVictoryArea: Boolean(gameState.hasReachedVictoryArea)
             },
             score: gameState.score,
             isGameOver: gameState.isGameOver,
@@ -234,7 +235,9 @@ const SimulationCore = {
                     version: map.version,
                     cols: map.cols,
                     rows: map.rows,
-                    tileSize: map.tileSize
+                    tileSize: map.tileSize,
+                    victoryArea: map.victoryArea || null,
+                    info: map.info || null
                 }
                 : null,
             latestTracer: tracers.length > 0 ? tracers[tracers.length - 1] : null,

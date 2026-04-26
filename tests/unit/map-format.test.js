@@ -65,6 +65,31 @@ describe('MapFormat', () => {
     expect(errors.some((entry) => entry.includes('settings.maxTargetsToKill'))).toBe(true);
   });
 
+  it('accepts optional victory area and info payload', () => {
+    const fixture = loadFixtureMap('smoke_default_map');
+    fixture.victoryArea = { col: 3, row: 4, width: 2, height: 2 };
+    fixture.info = {
+      title: 'Briefing',
+      body: ['Clear the room.', 'Reach the exit.']
+    };
+
+    const normalized = MapFormat.normalizeMapData(fixture);
+    expect(normalized.victoryArea).toEqual({ col: 3, row: 4, width: 2, height: 2 });
+    expect(normalized.info.title).toBe('Briefing');
+    expect(normalized.info.body).toEqual(['Clear the room.', 'Reach the exit.']);
+    expect(MapFormat.validateMapData(normalized)).toEqual([]);
+  });
+
+  it('rejects invalid victory area and info payloads', () => {
+    const fixture = loadFixtureMap('smoke_default_map');
+    fixture.victoryArea = { col: 31, row: 17, width: 2, height: 2 };
+    fixture.info = { title: 12, body: ['ok'] };
+
+    const errors = MapFormat.validateMapData(fixture);
+    expect(errors.some((entry) => entry.includes('victoryArea'))).toBe(true);
+    expect(errors.some((entry) => entry.includes('info.title'))).toBe(true);
+  });
+
   it('accepts and normalizes optional enemies payload', () => {
     const fixture = loadFixtureMap('smoke_default_map');
     fixture.enemies = [
@@ -123,6 +148,18 @@ describe('MapFormat', () => {
     expect(normalized.tiles.length).toBe(normalized.cols * normalized.rows);
     expect(horizontalBandAt(6)).toBe(10);
     expect(horizontalBandAt(11)).toBe(10);
+  });
+
+  it('accepts all committed level maps', () => {
+    const mapDir = path.join(process.cwd(), 'maps');
+    const catalog = JSON.parse(fs.readFileSync(path.join(mapDir, 'index.json'), 'utf8'));
+    for (const level of catalog.levels) {
+      const payload = JSON.parse(fs.readFileSync(path.join(process.cwd(), level.path), 'utf8'));
+      const normalized = MapFormat.normalizeMapData(payload);
+      expect(MapFormat.validateMapData(normalized)).toEqual([]);
+      expect(normalized.info?.body?.length).toBeGreaterThan(0);
+      expect(normalized.victoryArea).toBeTruthy();
+    }
   });
 
   it('repairs legacy padded tile rows instead of dropping to empty tiles', () => {

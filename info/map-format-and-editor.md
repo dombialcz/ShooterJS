@@ -13,6 +13,8 @@ Fields:
 - `doors` array of `{ col, row, orientation, hingeSide }`
 - `playerSpawn`
 - `targetSpawns`
+- `victoryArea` (optional `{ col, row, width, height }` extraction zone)
+- `info` (optional `{ title, body }`, where `body` is an array of briefing lines)
 - `enemies` (optional array of enemy spawn/combat descriptors)
 
 Tile values:
@@ -51,6 +53,7 @@ Tools:
 - erase
 - player spawn
 - target spawn
+- victory area
 - enemy melee spawn
 - enemy ranged spawn
 - patrol waypoint authoring (select enemy, then place/remove waypoints)

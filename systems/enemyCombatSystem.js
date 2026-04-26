@@ -97,7 +97,10 @@ const EnemyCombatSystem = {
         }
 
         if (shouldMiss) {
-            const missOffset = (this.nextEnemyRandom(enemy) * 2 - 1) * (CONFIG.ENEMY_SHOT_MISS_MAX_OFFSET_RAD || 0.34);
+            const maxOffset = CONFIG.ENEMY_SHOT_MISS_MAX_OFFSET_RAD || 0.34;
+            const missOffset = enemy.firstShotMustMiss
+                ? (this.nextEnemyRandom(enemy) < 0.5 ? -maxOffset : maxOffset)
+                : (this.nextEnemyRandom(enemy) * 2 - 1) * maxOffset;
             angle += missOffset;
         }
 

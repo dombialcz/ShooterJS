@@ -663,6 +663,44 @@ test.describe('Deterministic gameplay maps', () => {
     expect(result.isGameOver).toBe(true);
   });
 
+  test('victory area requires the player to extract after meeting the goal', async ({ page }) => {
+    const map = makeOpenEnemyMap('extract-goal');
+    map.settings.maxTargetsToKill = 1;
+    map.victoryArea = { col: 10, row: 9, width: 2, height: 2 };
+    map.targetSpawns = [{ col: 8, row: 9 }];
+
+    await setInlineMap(page, map, 'extract-goal');
+    await page.goto('/index.html');
+    await selectFirstLevel(page);
+    await page.waitForFunction(() => typeof window.advanceTime === 'function');
+
+    const beforeExit = await page.evaluate(() => {
+      window.__setTargetsDestroyed(1);
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false }
+      });
+      return JSON.parse(window.render_game_to_text());
+    });
+    expect(beforeExit.round.isLevelComplete).toBe(false);
+    expect(beforeExit.round.hasReachedVictoryArea).toBe(false);
+
+    const afterExit = await page.evaluate(() => {
+      const transform = window.game.state.player.getComponent('transform');
+      transform.x = 10 * 40 + 40;
+      transform.y = 9 * 40 + 40;
+      window.advanceTime(32, {
+        skipInput: true,
+        inputFrame: { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false }
+      });
+      return JSON.parse(window.render_game_to_text());
+    });
+
+    expect(afterExit.round.hasReachedVictoryArea).toBe(true);
+    expect(afterExit.round.isLevelComplete).toBe(true);
+    expect(afterExit.round.gameOverReason).toBe('level_complete');
+  });
+
   test('enemy stays idle without LOS and alerts after LOS is restored', async ({ page }) => {
     const map = makeOpenEnemyMap('enemy-los-gate');
     map.settings.maxTargetsToKill = 1;
@@ -759,7 +797,7 @@ test.describe('Deterministic gameplay maps', () => {
     await page.waitForFunction(() => typeof window.advanceTime === 'function');
 
     const firstWindow = await page.evaluate(() => {
-      window.advanceTime(1700, {
+      window.advanceTime(500, {
         skipInput: true,
         inputFrame: { moveX: 0, moveY: 0, aimAngle: 0, isADS: false, isShooting: false }
       });

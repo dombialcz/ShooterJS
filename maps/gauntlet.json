@@ -791,5 +791,19 @@
       },
       "patrol": []
     }
-  ]
+  ],
+  "victoryArea": {
+    "col": 28,
+    "row": 14,
+    "width": 2,
+    "height": 2
+  },
+  "info": {
+    "title": "Gauntlet",
+    "body": [
+      "Goal: eliminate 15 enemies, then reach the green EXIT area.",
+      "Time limit: 2:00.",
+      "Survive the gauntlet, avoid being surrounded, and extract after clearing the objective."
+    ]
+  }
 }

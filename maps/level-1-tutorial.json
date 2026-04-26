@@ -54,5 +54,21 @@
         { "col": 21, "row": 9 }
       ]
     }
-  ]
+  ],
+  "victoryArea": {
+    "col": 28,
+    "row": 14,
+    "width": 2,
+    "height": 2
+  },
+  "info": {
+    "title": "Level 1: Tutorial",
+    "body": [
+      "Goal: eliminate 5 threats, then reach the green EXIT area.",
+      "Time limit: 2:00.",
+      "Move with W, A, S, D.",
+      "Hold the mouse button to aim and fire. The longer you hold it, the tighter your precision becomes.",
+      "Zombies that get too close can block your shooting, so keep space while fighting."
+    ]
+  }
 }

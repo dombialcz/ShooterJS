@@ -69,5 +69,19 @@
         { "col": 25, "row": 9 }
       ]
     }
-  ]
+  ],
+  "victoryArea": {
+    "col": 28,
+    "row": 14,
+    "width": 2,
+    "height": 2
+  },
+  "info": {
+    "title": "Level 2: Training Grounds",
+    "body": [
+      "Goal: eliminate 6 threats, then reach the green EXIT area.",
+      "Time limit: 1:30.",
+      "Use the training grounds to manage distance and angles against mixed enemies."
+    ]
+  }
 }

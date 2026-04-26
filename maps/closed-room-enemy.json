@@ -51,5 +51,19 @@
       "attackCooldownMs": 900,
       "damage": 12
     }
-  ]
+  ],
+  "victoryArea": {
+    "col": 28,
+    "row": 14,
+    "width": 2,
+    "height": 2
+  },
+  "info": {
+    "title": "Closed Room Enemy",
+    "body": [
+      "Goal: eliminate 1 enemy, then reach the green EXIT area.",
+      "Time limit: 2:00.",
+      "Use the door and room layout to control the engagement."
+    ]
+  }
 }

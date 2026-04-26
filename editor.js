@@ -9,6 +9,8 @@
     const hingeSelect = document.getElementById('doorHinge');
     const timeLimitInput = document.getElementById('timeLimitMs');
     const maxTargetsInput = document.getElementById('maxTargetsToKill');
+    const infoTitleInput = document.getElementById('infoTitle');
+    const infoBodyInput = document.getElementById('infoBody');
     const enemySelectionHint = document.getElementById('enemySelectionHint');
 
     let activeTool = 'wall';
@@ -130,6 +132,9 @@
             }
         });
 
+        infoTitleInput.addEventListener('input', syncInfoFromInputs);
+        infoBodyInput.addEventListener('input', syncInfoFromInputs);
+
         document.getElementById('previewBtn').addEventListener('click', () => {
             persistMap();
             window.open('./index.html?editorPreview=1', '_blank');
@@ -176,10 +181,13 @@
             placeTile(cell.col, cell.row, MapFormat.TILE_EMPTY);
             removeDoorAt(cell.col, cell.row);
             removeEnemyAt(cell.col, cell.row);
+            removeVictoryAreaAt(cell.col, cell.row);
         } else if (activeTool === 'player') {
             mapData.playerSpawn = { col: cell.col, row: cell.row };
         } else if (activeTool === 'target') {
             toggleTargetSpawn(cell.col, cell.row);
+        } else if (activeTool === 'victory') {
+            toggleVictoryArea(cell.col, cell.row);
         } else if (activeTool === 'enemyMelee') {
             toggleEnemySpawn(cell.col, cell.row, 'melee');
         } else if (activeTool === 'enemyRanged') {
@@ -244,6 +252,36 @@
             return;
         }
         mapData.targetSpawns.push({ col, row });
+    }
+
+    function toggleVictoryArea(col, row) {
+        const width = 2;
+        const height = 2;
+        if (isInsideVictoryArea(col, row)) {
+            mapData.victoryArea = null;
+            return;
+        }
+        mapData.victoryArea = {
+            col: Math.min(col, mapData.cols - width),
+            row: Math.min(row, mapData.rows - height),
+            width,
+            height
+        };
+    }
+
+    function removeVictoryAreaAt(col, row) {
+        if (isInsideVictoryArea(col, row)) {
+            mapData.victoryArea = null;
+        }
+    }
+
+    function isInsideVictoryArea(col, row) {
+        const area = mapData.victoryArea;
+        if (!area) return false;
+        return col >= area.col
+            && row >= area.row
+            && col < area.col + area.width
+            && row < area.row + area.height;
     }
 
     function ensureEnemyArray() {
@@ -366,6 +404,7 @@
         drawGrid();
         drawTiles();
         drawDoors();
+        drawVictoryArea();
         drawPlayerSpawn();
         drawTargetSpawns();
         drawEnemyPatrols();
@@ -453,6 +492,30 @@
                 ctx.fill();
             }
         }
+    }
+
+    function drawVictoryArea() {
+        const area = mapData.victoryArea;
+        if (!area) return;
+
+        const tile = mapData.tileSize;
+        const x = area.col * tile;
+        const y = area.row * tile;
+        const width = area.width * tile;
+        const height = area.height * tile;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(83, 217, 105, 0.28)';
+        ctx.strokeStyle = '#53d969';
+        ctx.lineWidth = 3;
+        ctx.fillRect(x + 2, y + 2, width - 4, height - 4);
+        ctx.strokeRect(x + 2, y + 2, width - 4, height - 4);
+        ctx.fillStyle = '#d7ffdc';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('EXIT', x + width / 2, y + height / 2);
+        ctx.restore();
     }
 
     function drawPlayerSpawn() {
@@ -575,6 +638,21 @@
         mapData.settings = mapData.settings || {};
         mapData.settings.timeLimitMs = Number.parseInt(timeLimitInput.value, 10);
         mapData.settings.maxTargetsToKill = Number.parseInt(maxTargetsInput.value, 10);
+        if (infoTitleInput) {
+            infoTitleInput.value = mapData.info?.title || '';
+        }
+        if (infoBodyInput) {
+            infoBodyInput.value = Array.isArray(mapData.info?.body) ? mapData.info.body.join('\n') : '';
+        }
+    }
+
+    function syncInfoFromInputs() {
+        const title = (infoTitleInput?.value || '').trim();
+        const body = (infoBodyInput?.value || '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
+        mapData.info = title || body.length > 0 ? { title, body } : null;
     }
 
     function syncEnemySelectionHint() {
