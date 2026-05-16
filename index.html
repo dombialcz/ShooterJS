@@ -100,6 +100,26 @@
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
         }
         
+        #weaponIndicator {
+            position: absolute;
+            bottom: 24px;
+            right: 20px;
+            font-size: 16px;
+            color: #e0e0e0;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            text-align: right;
+            line-height: 1.5;
+        }
+
+        #weaponIndicator .weapon-slot {
+            opacity: 0.45;
+        }
+
+        #weaponIndicator .weapon-slot.active {
+            opacity: 1;
+            color: #ffe082;
+        }
+
         #adsIndicator {
             position: absolute;
             top: 20px;
@@ -299,6 +319,10 @@
             <div id="score">SCORE: <span id="scoreValue">0</span></div>
             <div id="roundTimer">TIME: <span id="timerValue">2:00</span></div>
             <div id="playerHp">HP: <span id="hpValue">100</span></div>
+            <div id="weaponIndicator">
+                <div id="weaponSlot1" class="weapon-slot active">[1] GUN</div>
+                <div id="weaponSlot2" class="weapon-slot">[2] MELEE</div>
+            </div>
             <div id="levelInfo">LEVEL: <span id="levelName">-</span></div>
             <div id="goal">GOAL: <span id="goalValue">0/0</span></div>
             <a id="editorLink" href="./editor.html">Open Map Editor</a>
@@ -335,6 +359,12 @@
     <script src="utils/collision.js"></script>
     <script src="utils/raycaster.js"></script>
     
+    <!-- Weapon Abstraction -->
+    <script src="weapons/WeaponBase.js"></script>
+    <script src="weapons/GunWeapon.js"></script>
+    <script src="weapons/MeleeWeapon.js"></script>
+    <script src="weapons/WeaponFactory.js"></script>
+
     <!-- Entity-Component System -->
     <script src="components.js"></script>
     <script src="entities.js"></script>
@@ -349,6 +379,7 @@
     <script src="systems/doorSystem.js"></script>
     <script src="systems/blockSystem.js"></script>
     <script src="systems/shootingSystem.js"></script>
+    <script src="systems/meleeSystem.js"></script>
     <script src="systems/enemyCombatSystem.js"></script>
     <script src="systems/renderSystem.js"></script>
 

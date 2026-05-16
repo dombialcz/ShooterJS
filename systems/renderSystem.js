@@ -30,10 +30,10 @@ const RenderSystem = {
         // Draw tracer lines (bullet tracers)
         this.drawTracers(ctx, gameState);
         
-        // Draw player and gun
+        // Draw player and active weapon
         if (gameState.player) {
             this.drawPlayer(ctx, gameState.player);
-            this.drawGun(ctx, gameState.player);
+            this.drawActiveWeapon(ctx, gameState.player, gameState);
         }
         
         // Draw hit markers
@@ -338,6 +338,76 @@ const RenderSystem = {
             gun.width
         );
         
+        ctx.restore();
+    },
+
+    drawActiveWeapon(ctx, player, gameState) {
+        const playerState = player.getComponent('playerState');
+        const activeWeapon = playerState ? playerState.activeWeapon : 'gun';
+        if (activeWeapon === 'melee') {
+            this.drawMeleeWeapon(ctx, player, gameState);
+        } else {
+            this.drawGun(ctx, player);
+        }
+    },
+
+    drawMeleeWeapon(ctx, player, gameState) {
+        const transform = player.getComponent('transform');
+        const melee = player.getComponent('melee');
+        if (!transform || !melee) return;
+
+        const now = (gameState && gameState.timeMs) ? gameState.timeMs : Date.now();
+
+        // Swing animation progress (0 = start, 1 = end)
+        let swingProgress = 0;
+        if (melee.swingStartMs !== null) {
+            swingProgress = Math.min(1, (now - melee.swingStartMs) / melee.swingDurationMs);
+        }
+
+        ctx.save();
+        ctx.translate(transform.x, transform.y);
+
+        // Swing arc: weapon sweeps from -40° to +40° around the aim direction
+        const arcHalf = Math.PI * 0.22; // ~40 degrees
+        const currentAngle = transform.rotation + (swingProgress * 2 - 1) * arcHalf;
+        ctx.rotate(currentAngle);
+
+        // Draw the blade as an offset rectangle
+        const offsetX = CONFIG.PLAYER_RADIUS + 4;
+        ctx.fillStyle = melee.color || CONFIG.MELEE_COLOR;
+        ctx.fillRect(offsetX, -melee.width / 2, melee.length, melee.width);
+
+        // Draw a highlight edge on the blade when swinging
+        if (melee.swingStartMs !== null && swingProgress < 1) {
+            ctx.globalAlpha = 1 - swingProgress;
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(offsetX, -melee.width / 2, melee.length, melee.width);
+        }
+
+        ctx.restore();
+
+        // Draw swing arc trace when attacking
+        if (melee.swingStartMs !== null && swingProgress < 1) {
+            this.drawMeleeSwingArc(ctx, transform, melee, now);
+        }
+    },
+
+    drawMeleeSwingArc(ctx, transform, melee, now) {
+        const swingProgress = Math.min(1, (now - melee.swingStartMs) / melee.swingDurationMs);
+        const arcHalf = Math.PI * 0.22;
+        const startAngle = transform.rotation - arcHalf;
+        const endAngle = transform.rotation - arcHalf + swingProgress * arcHalf * 2;
+        const radius = CONFIG.PLAYER_RADIUS + 4 + melee.length;
+
+        ctx.save();
+        ctx.globalAlpha = 0.35 * (1 - swingProgress);
+        ctx.strokeStyle = '#d0d0d0';
+        ctx.lineWidth = melee.length * 0.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(transform.x, transform.y, radius - melee.length * 0.25, startAngle, endAngle);
+        ctx.stroke();
         ctx.restore();
     },
     

@@ -14,6 +14,16 @@ const CONFIG = {
     GUN_WIDTH: 8,
     GUN_OFFSET_X: 15, // Distance from player center
     GUN_COLOR: '#1a1a1a',
+    GUN_FIRE_RATE: 200, // milliseconds between shots
+
+    // Melee weapon
+    MELEE_DAMAGE: 35,
+    MELEE_RANGE: 60,               // Maximum hit distance from player center (pixels)
+    MELEE_COOLDOWN_MS: 600,
+    MELEE_LENGTH: 28,              // Blade length for rendering
+    MELEE_WIDTH: 6,
+    MELEE_COLOR: '#b0b0b0',
+    MELEE_SWING_DURATION_MS: 250,  // Length of the swing animation
     FIRING_CONE_START_DEG: 20,
     FIRING_CONE_MIN_DEG: 0,
     FIRING_CONE_TIGHTEN_MS: 2000,

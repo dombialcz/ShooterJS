@@ -593,6 +593,12 @@ class Game {
             const hp = this.state.player?.getComponent('health')?.current;
             hpValue.textContent = Number.isFinite(hp) ? String(Math.max(0, Math.round(hp))) : '-';
         }
+
+        const activeWeapon = this.state.player?.getComponent('playerState')?.activeWeapon ?? 'gun';
+        const slot1 = document.getElementById('weaponSlot1');
+        const slot2 = document.getElementById('weaponSlot2');
+        if (slot1) slot1.classList.toggle('active', activeWeapon === 'gun');
+        if (slot2) slot2.classList.toggle('active', activeWeapon === 'melee');
     }
 }
 

@@ -17,6 +17,7 @@ const SimulationCore = {
             BlockSystem,
             VisionSystem,
             ShootingSystem,
+            MeleeSystem,
             EnemyCombatSystem
         };
 
@@ -43,6 +44,7 @@ const SimulationCore = {
 
         if (systems.VisionSystem) systems.VisionSystem.update(gameState, dt);
         if (systems.ShootingSystem) systems.ShootingSystem.update(gameState, dt);
+        if (systems.MeleeSystem) systems.MeleeSystem.update(gameState, dt);
         if (systems.EnemyCombatSystem) systems.EnemyCombatSystem.update(gameState, dt);
 
         return gameState;

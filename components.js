@@ -122,7 +122,8 @@ function Input() {
         moveY: 0,
         aimAngle: 0,
         isShooting: false,
-        isADS: false
+        isADS: false,
+        weaponSwitch: null  // null | 'gun' | 'melee'
     };
 }
 
@@ -132,7 +133,8 @@ function Input() {
 function PlayerState() {
     return {
         isADSActive: false,
-        movementSpeedMultiplier: 1
+        movementSpeedMultiplier: 1,
+        activeWeapon: 'gun'  // 'gun' | 'melee'
     };
 }
 

@@ -7,8 +7,18 @@ const ShootingSystem = {
         
         const gun = player.getComponent('gun');
         const input = player.getComponent('input');
+        const playerState = player.getComponent('playerState');
         
         if (!gun || !input) return;
+
+        // Skip when melee weapon is active
+        if (playerState && playerState.activeWeapon === 'melee') {
+            // Reset ADS spread so it starts fresh when switching back
+            gun.adsStartedAtMs = null;
+            const startHalfRad = (CONFIG.FIRING_CONE_START_DEG * Math.PI / 180) * 0.5;
+            gun.currentSpreadHalfAngleRad = startHalfRad;
+            return;
+        }
 
         this.updateFiringConeState(gameState, player);
         
